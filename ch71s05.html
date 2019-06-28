@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>71.5. dentry (カーネル)</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch71.html" title="第71章 Linux のファイルシステム" /><link rel="prev" href="ch71s04.html" title="71.4. inode (カーネル)" /><link rel="next" href="ch71s06.html" title="71.6. file (カーネル)" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch71s04.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch71s06.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_dentry_カーネル"></a>71.5. dentry (カーネル)</h2></div></div></div><p>　dentry は「 Directory Entry 」の略です。</p><p>　ディレクトリーを抽象化したオブジェクトですね。</p><p>　それとヘッダーソースは「 dcache.h 」にありますんで、他のファイルシステムオブジェクトとは別のヘッダーにあります。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/dcache.h
+ 88 struct dentry {
+ 89   /* RCU lookup touched fields */
+ 90   unsigned int d_flags;   /* protected by d_lock */
+ 91   seqcount_t d_seq;   /* per dentry seqlock */
+ 92   struct hlist_bl_node d_hash;  /* lookup hash list */
+ 93   struct dentry *d_parent;  /* parent directory */
+ 94   struct qstr d_name;
+ 95   struct inode *d_inode;    /* Where the name belongs to - NULL is
+ 96            * negative */
+ 97   unsigned char d_iname[DNAME_INLINE_LEN];  /* small names */
+ 98
+ 99   /* Ref lookup also touches following */
+100   struct lockref d_lockref; /* per-dentry lock and refcount */
+101   const struct dentry_operations *d_op;
+102   struct super_block *d_sb; /* The root of the dentry tree */
+103   unsigned long d_time;   /* used by d_revalidate */
+104   void *d_fsdata;     /* fs-specific data */
+105
+106   union {
+107     struct list_head d_lru;   /* LRU list */
+108     wait_queue_head_t *d_wait;  /* in-lookup ones only */
+109   };
+110   struct list_head d_child; /* child of parent list */
+111   struct list_head d_subdirs; /* our children */
+112   /*
+113    * d_alias and d_rcu can share memory
+114    */
+115   union {
+116     struct hlist_node d_alias;  /* inode alias list */
+117     struct hlist_bl_node d_in_lookup_hash;  /* only for in-lookup ones */
+118     struct rcu_head d_rcu;
+119   } d_u;
+120 } __randomize_layout;</pre><p>　dentry には3つの状態があります。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+used
+</span></dt><dd>
+(d_inode)が有効な inode を指しており 1 以上のユーザーがある状態（メモリーの解放はできない）
+</dd><dt><span class="term">
+unused
+</span></dt><dd>
+（d_inode）が有効な inode を指しているがユーザーなし（キャッシュとして保持するが、廃棄可能）
+</dd><dt><span class="term">
+negative
+</span></dt><dd>
+（d_inode）が有効な inode を指していない。存在しないファイルに open 関数を使うとおきる
+</dd></dl></div><p>　dentry はルックアップのためにキャッシュに保持されるために、こうした区別が必要とのことです。</p><pre class="programlisting">281 /* appendix may either be NULL or be used for transname suffixes */
+282 extern struct dentry *d_lookup(const struct dentry *, const struct qstr *);
+283 extern struct dentry *d_hash_and_lookup(struct dentry *, struct qstr *);
+284 extern struct dentry *__d_lookup(const struct dentry *, const struct qstr *);
+285 extern struct dentry *__d_lookup_rcu(const struct dentry *parent,
+286         const struct qstr *name, unsigned *seq);
+287
+288 static inline unsigned d_count(const struct dentry *dentry)
+289 {
+290   return dentry-&gt;d_lockref.count;
+291 }</pre><p>　dentry のルックアップには d_lookup 関数を使えます。</p><p>　dentry は LRU で掃除や回復をするようですが、3つの状態はその際にも使われます。</p><p>　あと dentry の細かな操作の関数ポインターについては dentry_operations オブジェクトに宣言されています。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/dcache.h
+134 struct dentry_operations {
+135   int (*d_revalidate)(struct dentry *, unsigned int);
+136   int (*d_weak_revalidate)(struct dentry *, unsigned int);
+137   int (*d_hash)(const struct dentry *, struct qstr *);
+138   int (*d_compare)(const struct dentry *,
+139       unsigned int, const char *, const struct qstr *);
+140   int (*d_delete)(const struct dentry *);
+141   int (*d_init)(struct dentry *);
+142   void (*d_release)(struct dentry *);
+143   void (*d_prune)(struct dentry *);
+144   void (*d_iput)(struct dentry *, struct inode *);
+145   char *(*d_dname)(struct dentry *, char *, int);
+146   struct vfsmount *(*d_automount)(struct path *);
+147   int (*d_manage)(const struct path *, bool);
+148   struct dentry *(*d_real)(struct dentry *, const struct inode *,
+149          unsigned int, unsigned int);
+150 } ____cacheline_aligned;</pre><p>　dentry の操作関数にはキャッシュ系のものが多いです。</p><p>　まあこの辺は重要じゃないので、理解するために投資する時間を考慮するなら、覚える必要はないと思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch71s04.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch71.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch71s06.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

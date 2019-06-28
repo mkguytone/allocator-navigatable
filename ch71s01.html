@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>71.1. カーネルヘッダー ( /usr/src/ )</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch71.html" title="第71章 Linux のファイルシステム" /><link rel="prev" href="ch71.html" title="第71章 Linux のファイルシステム" /><link rel="next" href="ch71s02.html" title="71.2. カーネルソースのアーカイブ" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch71.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch71s02.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_カーネルヘッダー_usr_src"></a>71.1. カーネルヘッダー ( /usr/src/ )</h2></div></div></div><p>　ファイルシステムについてカーネルヘッダーをインストールする必要があります。</p><p>　インストールには apt を使います。</p><pre class="programlisting">$ uname -r
+4.18.16-041816-generic
+$ sudo apt install linux-headers-$(uname -r)</pre><p>　uname の結果は現在使っている Linux のバージョンを示しています。</p><p>　apt は linux-headers-（カーネルバージョン名）の名前で、現在使っているカーネルに対応するカーネルヘッダーをインストールできます。</p><p>　それで筆者の端末では、何度もヘッダーを導入した結果として以下のようになってます。</p><pre class="programlisting">$ ls
+gmock                                linux-headers-4.16.11-041611-generic  linux-headers-4.18.0-041800-generic
+googletest                           linux-headers-4.16.18-041618          linux-headers-4.18.11-041811
+gtest                                linux-headers-4.16.18-041618-generic  linux-headers-4.18.11-041811-generic
+linux-headers-4.15.0-36              linux-headers-4.17.18-041718          linux-headers-4.18.16-041816
+linux-headers-4.15.0-36-generic      linux-headers-4.17.18-041718-generic  linux-headers-4.18.16-041816-generic
+linux-headers-4.16.0-041600          linux-headers-4.17.19-041719          linux-headers-4.18.7-041807
+linux-headers-4.16.0-041600-generic  linux-headers-4.17.19-041719-generic  linux-headers-4.18.7-041807-generic
+linux-headers-4.16.11-041611         linux-headers-4.18.0-041800           virtualbox-5.2.10
+$ uname -r
+4.18.11-041811-generic
+$ cd /usr/src/linux-headers-$(uname -r)/include/linux
+$ pwd
+/usr/src/linux-headers-4.18.16-041816-generic/include/linux</pre><p>　「 /usr/src/linux-headers-4.18.11-041811-generic/include/linux 」というのは「 /usr/src/linux-headers-$(uname -r)/include/linux 」と等しいです。</p><p>　このディレクトリーにはファイルシステムだけでなく基本的なヘッダーは全部入っています。</p><p>　ですが次の項目でチェックするのは以下の 2 つです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+fs.h
+</span></dt><dd>
+super_block / inode / file が宣言されてます。
+</dd><dt><span class="term">
+dcache.h
+</span></dt><dd>
+dentry が宣言されてます。
+</dd></dl></div><p>　特に fs.h は巨大ですが、読んでみる価値はあると思いますよ。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch71.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch71.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch71s02.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第82章 fork() で共有ファイルマッピングをチェック</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt06.html" title="パート VI. mmap" /><link rel="prev" href="ch81.html" title="第81章 fork() でプライベートアノニマスマッピングをチェック" /><link rel="next" href="ch83.html" title="第83章 fork() で共有アノニマスマッピングをチェック" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch81.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch83.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_fork_で共有ファイルマッピングをチェック"></a>第82章 fork() で共有ファイルマッピングをチェック</h2></div></div></div><p>　共有ファイルマッピングは MAP_SHARED を使ったファイルマッピングです。</p><p>　ファイルマッピングは複数のプロセスで共有されるため、他のプロセスはマッピングしたリソースに対しての変更を見ることができます。</p><p><strong>main.c. </strong>
+</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+  2 #include &lt;stdlib.h&gt;
+  3 #include &lt;string.h&gt;
+  4 #include &lt;sys/mman.h&gt;
+  5 #include &lt;sys/stat.h&gt;
+  6 #include &lt;sys/types.h&gt;
+  7 #include &lt;unistd.h&gt;
+  8 #include &lt;fcntl.h&gt;
+  9
+ 10 #define BUF_SIZE 8
+ 11
+ 12 int main()
+ 13 {
+ 14   int fd,i;
+ 15   struct stat sb;
+ 16   char buf[BUF_SIZE];
+ 17   char *mm;
+ 18
+ 19   memset(buf,0,BUF_SIZE);
+ 20
+ 21   fd = open("abc.txt",O_CREAT|O_RDWR|O_TRUNC,0644);
+ 22   if(fd &lt; 0) {
+ 23     perror("ファイルを開けません");
+ 24     exit(1);
+ 25   }
+ 26   write(fd,buf,BUF_SIZE);
+ 27   if(fstat(fd,&amp;sb) == -1) {
+ 28     perror("stat");
+ 29     exit(1);
+ 30   }
+ 31
+ 32   mm = mmap(NULL,sb.st_size,PROT_WRITE|PROT_READ,MAP_SHARED,fd,0);
+ 33   if(mm == MAP_FAILED){
+ 34     perror("mmap");
+ 35     exit(1);
+ 36   }
+ 37
+ 38   pid_t id = fork();
+ 39
+ 40   if(id == 0) {
+ 41     for(i = 0; i &lt; sb.st_size-2; i++)
+ 42       mm[i] = 'a'+i;
+ 43     mm[sb.st_size-2] = '\n';
+ 44     mm[sb.st_size-1] = '\0';
+ 45
+ 46   } else {
+ 47     for(i = 0; i &lt; sb.st_size-2; i++)
+ 48       mm[i] = 'a';
+ 49     mm[sb.st_size-2] = '\n';
+ 50     mm[sb.st_size-1] = '\0';
+ 51   }
+ 52
+ 53   msync(mm,sb.st_size,MS_SYNC);
+ 54   for(i = 0; i &lt; 10; i++)
+ 55     printf("mm[%d] =&gt; %c\n",i,mm[i]);
+ 56
+ 57   if(munmap(mm,sb.st_size) == -1) {
+ 58     perror("munmap");
+ 59     exit(1);
+ 60   }
+ 61   close(fd);
+ 62
+ 63   return 0;
+ 64 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+mm[0] =&gt; a
+mm[1] =&gt; b
+mm[2] =&gt; c
+mm[3] =&gt; d
+mm[4] =&gt; e
+mm[5] =&gt; f
+mm[6] =&gt;
+
+mm[7] =&gt;
+mm[8] =&gt;
+mm[0] =&gt; a
+mm[9] =&gt;
+mm[1] =&gt; b
+mm[2] =&gt; c
+mm[3] =&gt; d
+mm[4] =&gt; e
+mm[5] =&gt; f
+mm[6] =&gt;
+
+mm[7] =&gt;
+mm[8] =&gt;
+mm[9] =&gt;</pre><p>
+</p><p>　実行結果を見て分かるとおり、親プロセスと子プロセスは同じ値になっていますね。</p><p>　この場合は子プロセスの書き込みが後に来ているようなので、子プロセスの配列結果が共有されてます。</p><p>　msync() は単にファイルに書き込みするだけなので、この場合は書き込み順序に影響は与えないと思います。</p><p>　ソースを解析したりデバッグすれば、順序の解析もできるかもしれませんが、そこまでの気力が筆者に無いです。</p><p>　(´・ω・｀)</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch81.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt06.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch83.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

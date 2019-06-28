@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>109.1. ポリモーフィックアロケーターの実装</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch109.html" title="第109章 std::pmr::polymorphic_allocator の動作チェック" /><link rel="prev" href="ch109.html" title="第109章 std::pmr::polymorphic_allocator の動作チェック" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch109.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> </td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_ポリモーフィックアロケーターの実装"></a>109.1. ポリモーフィックアロケーターの実装</h2></div></div></div><p>　memory_resource には std::pair に対しての処理が入っていなかったですね。</p><p>　おんや？　これで良いんだべ？</p><p>　とか疑問に思った読者もいるでしょう。</p><p>　はい、std::pair 引数の受付は memory_resource ではなく polymorphic_allocator によって、実装されています。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+uses_allocator.h
+</li><li class="listitem">
+memory_resource
+</li></ul></div><p>　この 2 つのヘッダーが良くも悪くも、今の実装状況ということになるかと思います。</p><p><strong>uses_allocator.h (<a class="ulink" href="https://github.com/MacKomatsu/gcc/blob/master/libstdc%2B%2B-v3/include/bits/uses_allocator.h" target="_top">https://github.com/MacKomatsu/gcc/blob/master/libstdc%2B%2B-v3/include/bits/uses_allocator.h</a>). </strong>
+</p><pre class="programlisting"> 55   template&lt;typename _Tp, typename _Alloc, typename = __void_t&lt;&gt;&gt;
+ 56     struct __uses_allocator_helper
+ 57     : false_type { };
+ 58
+ 59   template&lt;typename _Tp, typename _Alloc&gt;
+ 60     struct __uses_allocator_helper&lt;_Tp, _Alloc,
+ 61            __void_t&lt;typename _Tp::allocator_type&gt;&gt;
+ 62     : __is_erased_or_convertible&lt;_Alloc, typename _Tp::allocator_type&gt;::type
+ 63     { };
+ 64
+ 65   /// [allocator.uses.trait]
+ 66   template&lt;typename _Tp, typename _Alloc&gt;
+ 67     struct uses_allocator
+ 68     : __uses_allocator_helper&lt;_Tp, _Alloc&gt;::type
+ 69     { };
+ 70
+ 71   struct __uses_alloc_base { };
+ 72
+ 73   struct __uses_alloc0 : __uses_alloc_base
+ 74   {
+ 75     struct _Sink { void operator=(const void*) { } } _M_a;
+ 76   };
+ 77
+ 78   template&lt;typename _Alloc&gt;
+ 79     struct __uses_alloc1 : __uses_alloc_base { const _Alloc* _M_a; };
+ 80
+ 81   template&lt;typename _Alloc&gt;
+ 82     struct __uses_alloc2 : __uses_alloc_base { const _Alloc* _M_a; };
+ 83
+ 84   template&lt;bool, typename _Tp, typename _Alloc, typename... _Args&gt;
+ 85     struct __uses_alloc;
+ 86
+ 87   template&lt;typename _Tp, typename _Alloc, typename... _Args&gt;
+ 88     struct __uses_alloc&lt;true, _Tp, _Alloc, _Args...&gt;
+ 89     : conditional&lt;
+ 90         is_constructible&lt;_Tp, allocator_arg_t, _Alloc, _Args...&gt;::value,
+ 91         __uses_alloc1&lt;_Alloc&gt;,
+ 92         __uses_alloc2&lt;_Alloc&gt;&gt;::type
+ 93     {
+ 94       static_assert(__or_&lt;
+ 95     is_constructible&lt;_Tp, allocator_arg_t, _Alloc, _Args...&gt;,
+ 96     is_constructible&lt;_Tp, _Args..., _Alloc&gt;&gt;::value, "construction with"
+ 97     " an allocator must be possible if uses_allocator is true");
+ 98     };
+ 99
+100   template&lt;typename _Tp, typename _Alloc, typename... _Args&gt;
+101     struct __uses_alloc&lt;false, _Tp, _Alloc, _Args...&gt;
+102     : __uses_alloc0 { };
+103
+104   template&lt;typename _Tp, typename _Alloc, typename... _Args&gt;
+105     using __uses_alloc_t =
+106       __uses_alloc&lt;uses_allocator&lt;_Tp, _Alloc&gt;::value, _Tp, _Alloc, _Args...&gt;;
+107
+108   template&lt;typename _Tp, typename _Alloc, typename... _Args&gt;
+109     inline __uses_alloc_t&lt;_Tp, _Alloc, _Args...&gt;
+110     __use_alloc(const _Alloc&amp; __a)
+111     {
+112       __uses_alloc_t&lt;_Tp, _Alloc, _Args...&gt; __ret;
+113       __ret._M_a = std::__addressof(__a);
+114       return __ret;
+115     }</pre><p>
+</p><p>　ポリモーフィックアロケーターのソースコードは以下の通りです。</p><p><strong>polymorphic_allocator クラス (<a class="ulink" href="https://github.com/MacKomatsu/gcc/blob/master/libstdc%2B%2B-v3/include/experimental/memory_resource" target="_top">https://github.com/MacKomatsu/gcc/blob/master/libstdc%2B%2B-v3/include/experimental/memory_resource</a>). </strong>
+</p><pre class="programlisting">115   // 8.6 Class template polymorphic_allocator
+116   template &lt;class _Tp&gt;
+117     class polymorphic_allocator
+118     {
+119       using __uses_alloc1_ = __uses_alloc1&lt;memory_resource*&gt;;
+120       using __uses_alloc2_ = __uses_alloc2&lt;memory_resource*&gt;;
+121
+122       template&lt;typename _Tp1, typename... _Args&gt;
+123   void
+124   _M_construct(__uses_alloc0, _Tp1* __p, _Args&amp;&amp;... __args)
+125   { ::new(__p) _Tp1(std::forward&lt;_Args&gt;(__args)...); }
+126
+127       template&lt;typename _Tp1, typename... _Args&gt;
+128   void
+129   _M_construct(__uses_alloc1_, _Tp1* __p, _Args&amp;&amp;...  __args)
+130   { ::new(__p) _Tp1(allocator_arg, this-&gt;resource(),
+131         std::forward&lt;_Args&gt;(__args)...); }
+132
+133       template&lt;typename _Tp1, typename... _Args&gt;
+134   void
+135   _M_construct(__uses_alloc2_, _Tp1* __p, _Args&amp;&amp;...  __args)
+136   { ::new(__p) _Tp1(std::forward&lt;_Args&gt;(__args)...,
+137         this-&gt;resource()); }
+138
+139     public:
+140       using value_type = _Tp;
+141
+142       polymorphic_allocator() noexcept
+143       : _M_resource(get_default_resource())
+144       { }
+145
+146       polymorphic_allocator(memory_resource* __r)
+147       : _M_resource(__r)
+148       { _GLIBCXX_DEBUG_ASSERT(__r); }
+149
+150       polymorphic_allocator(const polymorphic_allocator&amp; __other) = default;
+151
+152       template &lt;typename _Up&gt;
+153   polymorphic_allocator(const polymorphic_allocator&lt;_Up&gt;&amp;
+154             __other) noexcept
+155   : _M_resource(__other.resource())
+156   { }
+157
+158       polymorphic_allocator&amp;
+159   operator=(const polymorphic_allocator&amp; __rhs) = default;
+160
+161       _Tp* allocate(size_t __n)
+162       { return static_cast&lt;_Tp*&gt;(_M_resource-&gt;allocate(__n * sizeof(_Tp),
+163                    alignof(_Tp))); }
+164
+165       void deallocate(_Tp* __p, size_t __n)
+166       { _M_resource-&gt;deallocate(__p, __n * sizeof(_Tp), alignof(_Tp)); }
+167
+168       template &lt;typename _Tp1, typename... _Args&gt; //used here
+169   void construct(_Tp1* __p, _Args&amp;&amp;... __args)
+170   {
+171     memory_resource* const __resource = this-&gt;resource();
+172     auto __use_tag
+173       = __use_alloc&lt;_Tp1, memory_resource*, _Args...&gt;(__resource);
+174     _M_construct(__use_tag, __p, std::forward&lt;_Args&gt;(__args)...);
+175   }
+176
+177       // Specializations for pair using piecewise construction
+178       template &lt;typename _Tp1, typename _Tp2,
+179          typename... _Args1, typename... _Args2&gt;
+180   void construct(pair&lt;_Tp1, _Tp2&gt;* __p, piecewise_construct_t,
+181            tuple&lt;_Args1...&gt; __x,
+182            tuple&lt;_Args2...&gt; __y)
+183   {
+184     memory_resource* const __resource = this-&gt;resource();
+185     auto __x_use_tag =
+186       __use_alloc&lt;_Tp1, memory_resource*, _Args1...&gt;(__resource);
+187     auto __y_use_tag =
+188       __use_alloc&lt;_Tp2, memory_resource*, _Args2...&gt;(__resource);
+189
+190     ::new(__p) std::pair&lt;_Tp1, _Tp2&gt;(piecewise_construct,
+191              _M_construct_p(__x_use_tag, __x),
+192              _M_construct_p(__y_use_tag, __y));
+193   }
+194
+195       template &lt;typename _Tp1, typename _Tp2&gt;
+196   void construct(pair&lt;_Tp1,_Tp2&gt;* __p)
+197   { this-&gt;construct(__p, piecewise_construct, tuple&lt;&gt;(), tuple&lt;&gt;()); }
+198
+199       template &lt;typename _Tp1, typename _Tp2, typename _Up, typename _Vp&gt;
+200   void construct(pair&lt;_Tp1,_Tp2&gt;* __p, _Up&amp;&amp; __x, _Vp&amp;&amp; __y)
+201   { this-&gt;construct(__p, piecewise_construct,
+202         forward_as_tuple(std::forward&lt;_Up&gt;(__x)),
+203         forward_as_tuple(std::forward&lt;_Vp&gt;(__y))); }
+204
+205       template &lt;typename _Tp1, typename _Tp2, typename _Up, typename _Vp&gt;
+206   void construct(pair&lt;_Tp1,_Tp2&gt;* __p, const std::pair&lt;_Up, _Vp&gt;&amp; __pr)
+207   { this-&gt;construct(__p, piecewise_construct, forward_as_tuple(__pr.first),
+208         forward_as_tuple(__pr.second)); }
+209
+210       template &lt;typename _Tp1, typename _Tp2, typename _Up, typename _Vp&gt;
+211   void construct(pair&lt;_Tp1,_Tp2&gt;* __p, pair&lt;_Up, _Vp&gt;&amp;&amp; __pr)
+212   { this-&gt;construct(__p, piecewise_construct,
+213         forward_as_tuple(std::forward&lt;_Up&gt;(__pr.first)),
+214         forward_as_tuple(std::forward&lt;_Vp&gt;(__pr.second))); }
+215
+216       template &lt;typename _Up&gt;
+217   void destroy(_Up* __p)
+218   { __p-&gt;~_Up(); }
+219
+220       // Return a default-constructed allocator (no allocator propagation)
+221       polymorphic_allocator select_on_container_copy_construction() const
+222       { return polymorphic_allocator(); }
+223
+224       memory_resource* resource() const
+225       { return _M_resource; }
+226
+227     private:
+228       template&lt;typename _Tuple&gt;
+229   _Tuple&amp;&amp;
+230   _M_construct_p(__uses_alloc0, _Tuple&amp; __t)
+231   { return std::move(__t); }
+232
+233       template&lt;typename... _Args&gt;
+234   decltype(auto)
+235   _M_construct_p(__uses_alloc1_ __ua, tuple&lt;_Args...&gt;&amp; __t)
+236   { return tuple_cat(make_tuple(allocator_arg, *(__ua._M_a)),
+237          std::move(__t)); }
+238
+239       template&lt;typename... _Args&gt;
+240   decltype(auto)
+241   _M_construct_p(__uses_alloc2_ __ua, tuple&lt;_Args...&gt;&amp; __t)
+242   { return tuple_cat(std::move(__t), make_tuple(*(__ua._M_a))); }
+243
+244       memory_resource* _M_resource;
+245     };</pre><p>
+</p><p>　はーいはい、これまでの本書の蓄積があれば、ソースの分かりみが深いはずです。</p><p>　ですよね？</p><p>　std::pair 対策もきっちりやっていますし、筆者のサンプルコードと違って非の打ち所の無い完璧なコードです。</p><p>　他の pmr コンテナについては以下のような定義となると思いますが 2019 年の段階で使えるかは、まだ試していないので分かりませんね。</p><pre class="programlisting">namespace pmr {
+    template &lt;class T&gt;
+    using list = std::list&lt;T, std::pmr::polymorphic_allocator&lt;T&gt;&gt;;
+}
+
+namespace pmr {
+    template &lt;class Key, class T, class Compare = std::less&lt;Key&gt;&gt;
+    using map = std::map&lt;Key, T, Compare,
+                         std::pmr::polymorphic_allocator&lt;std::pair&lt;const Key,T&gt;&gt;&gt;
+}
+
+namespace pmr {
+    template &lt;class Key, class Compare = std::less&lt;Key&gt;&gt;
+    using multiset = std::multiset&lt;Key, Compare,
+                                   std::pmr::polymorphic_allocator&lt;Key&gt;&gt;;
+}
+
+namespace pmr {
+    template &lt;class Key, class Compare = std::less&lt;Key&gt;&gt;
+    using set = std::set&lt;Key, Compare, std::pmr::polymorphic_allocator&lt;Key&gt;&gt;;
+}
+
+namespace pmr {
+    template &lt;class Key,
+              class T,
+              class Hash = std::hash&lt;Key&gt;,
+              class Pred = std::equal_to&lt;Key&gt;&gt;
+    using unordered_map = std::unordered_map&lt;Key, T, Hash, Pred,
+                              std::pmr::polymorphic_allocator&lt;std::pair&lt;const Key,T&gt;&gt;&gt;;
+}
+
+namespace pmr {
+    template &lt;class Key, class T,
+              class Hash = std::hash&lt;Key&gt;,
+              class Pred = std::equal_to&lt;Key&gt;&gt;
+    using unordered_multimap = std::unordered_multimap&lt;Key, T, Hash, Pred,
+                                   std::pmr::polymorphic_allocator&lt;std::pair&lt;const Key,T&gt;&gt;&gt;;
+}
+
+namespace pmr {
+    template &lt;class Key,
+              class Hash = std::hash&lt;Key&gt;,
+              class Pred = std::equal_to&lt;Key&gt;&gt;
+    using unordered_set = std::unordered_set&lt;Key, Hash, Pred,
+                                             std::pmr::polymorphic_allocator&lt;Key&gt;&gt;;
+}
+
+namespace pmr {
+    template &lt;class Key,
+              class Hash = std::hash&lt;Key&gt;,
+              class Pred = std::equal_to&lt;Key&gt;&gt;
+    using unordered_multiset = std::unordered_multiset&lt;Key, Hash, Pred,
+                                   std::pmr::polymorphic_allocator&lt;Key&gt;&gt;
+}</pre><p>　まだ実験的なものという理解なんで、これを使用しているコードを見る機会はあまり無いと思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch109.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch109.html">上に戻る</a></td><td width="40%" align="right"> </td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第92章 malloc を使ってヒープに割り当て</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt10.html" title="パート X. ヒープ領域のアドレスに割り当て" /><link rel="prev" href="ch91.html" title="第91章 ヒープ領域のアドレス" /><link rel="next" href="ch93.html" title="第93章 カスタムヒープアロケーター" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch91.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch93.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_malloc_を使ってヒープに割り当て"></a>第92章 malloc を使ってヒープに割り当て</h2></div></div></div><p>　それではヒープ領域に割り当てる方式を見て見ましょう。</p><p><strong>main.cpp. </strong>
+</p><pre class="programlisting">  1 #include &lt;cstdlib&gt;
+  2 #include &lt;cstdint&gt;
+  3 #include &lt;new&gt;
+  4 #include &lt;iostream&gt;
+  5
+  6 int main()
+  7 {
+  8   char* y = (char*)std::malloc(sizeof(char)*1024);
+  9   ::new (y) int(100);
+ 10   char* next = y + sizeof(std::uintptr_t);
+ 11   ::new (next) int(200);
+ 12   char* nnext = y + sizeof(std::uintptr_t)*2;
+ 13   ::new (nnext) int(300);
+ 14   std::free(y);
+ 15   return 0;
+ 16 }</pre><p>
+</p><p>　基本的な考え方としては malloc コールで割り当てたアドレスプール（またはアドレス領域）を再利用するってことです。</p><pre class="programlisting">  8   char* y = (char*)std::malloc(sizeof(char)*1024);
+  9   ::new (y) int(100);</pre><p>　1024 バイトのヒープ領域を確保して開始アドレスに整数データ 100 を設定してるだけですね。</p><p>　次は開始アドレス以外でも割り当てが可能な試してみます。</p><pre class="programlisting"> 10   char* next = y + sizeof(std::uintptr_t);
+ 11   ::new (next) int(200);
+ 12   char* nnext = y + sizeof(std::uintptr_t)*2;
+ 13   ::new (nnext) int(300);</pre><p>　std::uintptr_t はポインターのデータ型のことです。</p><p>　なぜ int のサイズでなくポインター変数のサイズを使うかというと、next や nnext は malloc が割り当てたのと同じアラインメントで配置 new されるのが自然だからです。</p><p>　それで malloc のバイト境界って具体的にいくらなのさ？</p><p>　てな疑問が浮かぶでしょうが、これは状況によりますね。</p><p>　筆者の知る限りでは malloc のアラインメントは実装依存となるはずでして、最低でもポインターのサイズにしておくのが安全です。</p><p>　Windows 64 bit だと 16 バイト境界、Linux だと 8 バイト境界か 16 バイト境界のいずれかになるでしょうね。</p><p>　この場合 int 型に対してなのですからポインター変数のサイズで問題ないでしょう（たぶん…）。</p><p>　ちなみにプログラムをビルドしてデバッグをすると以下のようになります。</p><p><strong>ビルドとGDBデバッグ. </strong>
+</p><pre class="programlisting">$ g++ main.cpp -g
+$ gdb ./a.out
+Breakpoint 1, main () at main.cpp:8
+8         char* y = (char*)std::malloc(sizeof(char)*1024);
+(gdb) n
+9         ::new (y) int(100);
+(gdb) n
+10        char* next = y + sizeof(std::uintptr_t);
+(gdb) n
+11        ::new (next) int(200);
+(gdb) n
+12        char* nnext = y + sizeof(std::uintptr_t)*2;
+(gdb) n
+13        ::new (nnext) int(300);
+(gdb) n
+14        std::free(y);
+(gdb) x /u y
+0x555555767e70: 100
+(gdb) x /u next
+0x555555767e78: 200
+(gdb) x /u nnext
+0x555555767e80: 300
+(gdb) info proc mappings
+process 7764
+Mapped address spaces:
+
+          Start Addr           End Addr       Size     Offset objfile
+      0x555555554000     0x555555555000     0x1000        0x0
+      0x555555756000     0x555555777000    0x21000        0x0 [heap]
+      0x7ffff7ff7000     0x7ffff7ffa000     0x3000        0x0 [vvar]
+      0x7ffff7ffa000     0x7ffff7ffc000     0x2000        0x0 [vdso]
+      0x7ffffffde000     0x7ffffffff000    0x21000        0x0 [stack]
+  0xffffffffff600000 0xffffffffff601000     0x1000        0x0 [vsyscall]</pre><p>
+</p><p>　このデバッグ結果の中で重要なのは y / next / nnext のアドレスがヒープ領域に存在することです。</p><p>　「info proc mappings」によるとヒープ領域は 0x555555756000 と 0x555555777000 の間となります。</p><p>　そして以下のように各アドレスはこの領域におさまります。</p><pre class="programlisting">(gdb) x /u y
+0x555555767e70: 100
+(gdb) x /u next
+0x555555767e78: 200
+(gdb) x /u nnext
+0x555555767e80: 300</pre><p>　y が保持するアドレスは「0x555555767e70」で、ポインターの先の値は 100 となります。</p><p>　このように一旦割り当てたヒープ内でのプールでオブジェクトの構成と破壊をすることで毎回 malloc() を呼ぶことを避けることができます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch91.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt10.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch93.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

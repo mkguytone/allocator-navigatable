@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>25.1. ASLR と共有オブジェクト</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch25.html" title="第25章 malloc を strace で検証してみる" /><link rel="prev" href="ch25.html" title="第25章 malloc を strace で検証してみる" /><link rel="next" href="ch26.html" title="第26章 MALLOC(3) Linux プログラマーマニュアル" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch25.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch26.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_aslr_と共有オブジェクト"></a>25.1. ASLR と共有オブジェクト</h2></div></div></div><p>　ちなみに malloc を除くと観察眼の鋭い読者はアドレスが違うことも突っ込むかもしれません。</p><p>　ASLR (Address space layout randomization) は Linux カーネルが自動的に行うセキュリティー対策です。</p><p>　ASLR はアドレス空間の配置をランダム化するため、ヒープやスタック等のアドレスレイアウトは実行するたびに変わっていきます。</p><p>　まあ雑学ですが試しにやってみましょう。</p><pre class="programlisting">$ gcc empty.c
+$ file ./a.out
+./a.out: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=3442e99a7a1f9aedf7d82e9b190bb77b1773a049, not stripped
+$ strace ./a.out
+execve("./a.out", ["./a.out"], 0x7ffded1e1640 /* 57 vars */) = 0
+brk(NULL)                               = 0x555da594e000
+....
+$ strace ./a.out
+execve("./a.out", ["./a.out"], 0x7ffd2af313d0 /* 57 vars */) = 0
+brk(NULL)                               = 0x5649fc562000
+....
+$ strace ./a.out
+execve("./a.out", ["./a.out"], 0x7ffefd873730 /* 57 vars */) = 0
+brk(NULL)                               = 0x55e0e79e2000</pre><p>　表示されるアドレスはどの回も全て違いますよね？</p><p>　ビルド時にポジション独立のフラグを削ったらどうでしょうかね？</p><pre class="programlisting">$ gcc empty.c -no-pie
+$ file ./a.out
+./a.out: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=0e84efc9f16719b1f2f3ca031ee8c33c555a46ca, not stripped
+$ strace ./a.out
+execve("./a.out", ["./a.out"], 0x7ffc46b88170 /* 57 vars */) = 0
+brk(NULL)                               = 0xf83000
+....
+$ strace ./a.out
+execve("./a.out", ["./a.out"], 0x7fffa75f73b0 /* 57 vars */) = 0
+brk(NULL)                               = 0x162e000
+....
+$ strace ./a.out
+execve("./a.out", ["./a.out"], 0x7ffccc7592c0 /* 57 vars */) = 0
+brk(NULL)                               = 0x1854000
+....</pre><p>　アドレスは毎回違いますが brk(NULL) のコールは毎回違ってるだけでなく、アドレスがポジション依存になっていることが見て取れます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch25.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch25.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch26.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

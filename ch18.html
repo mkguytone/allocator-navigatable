@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第18章 fprintf 関数</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt02.html" title="パート II. Linux (POSIX) のファイル入出力" /><link rel="prev" href="ch17.html" title="第17章 system 関数" /><link rel="next" href="ch19.html" title="第19章 open / dprintf 関数" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch17.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch19.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_fprintf_関数"></a>第18章 fprintf 関数</h2></div></div></div><p>　それで、ここまでは茶番でした。</p><p>　標準出力に文字列を送るのは echo / cat とか printf / puts とかでできますが、こうした関数では狭い分野での活用しかできません。</p><p>　標準出力に限らず、送りたい出力ストリーム（ output stream ）を指定できれば、ぐっとプログラミングの幅が広がりそうです。</p><p>　ファイル入出力というと間違いなく使えるのが fprintf です。</p><p>　printf と同じ？ ええ…</p><p>　(´・ω・｀)</p><p>　実はそう単純な話でもないんですよね…　これが。</p><p>　まずは関数の宣言です。</p><pre class="programlisting">int fprintf(FILE *stream, const char *format, ...);</pre><p>　FILE というオブジェクトを指すポインター stream を引数で指定できるようになってます。</p><p>　stream には出力ストリームを指定できます。</p><p>　例えば以下のようなものです。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+stdout
+</li><li class="listitem">
+stderr
+</li></ul></div><p>　stdout は標準出力、 stderr には標準エラーを出力先とできます。</p><p>　では試して見ましょう。</p><p><strong>main.c. </strong>
+</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+  2
+  3 int main()
+  4 {
+  5   int x = 100;
+  6   printf("0x%x\n",x);
+  7   fprintf(stdout,"%d\n",x);
+  8   fprintf(stderr,"error\n");
+  9   return 0;
+ 10 }</pre><p>
+</p><p>　fprintf の出力結果は、標準出力と標準エラーの 2 つにわけられるので、ファイル記述子を指定すれば正確に何が起きているのが把握できます。</p><pre class="programlisting">$ ./a.out
+0x64
+100
+error
+$ ./a.out 1&gt;/dev/null
+error
+$ ./a.out 2&gt;/dev/null
+0x64
+100
+$ ./a.out 1&gt;/dev/null 2&gt;/dev/null</pre><p>　このように使うことができますね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch17.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt02.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch19.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

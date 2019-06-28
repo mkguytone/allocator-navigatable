@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第102章 ユーザーによるオブジェクト管理を前提にするカスタムページアロケーター</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt13.html" title="パート XIII. mmap() を使ったカスタムアロケーター" /><link rel="prev" href="pt13.html" title="パート XIII. mmap() を使ったカスタムアロケーター" /><link rel="next" href="ch103.html" title="第103章 カスタムアロケーターによるブロック管理" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="pt13.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch103.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_ユーザーによるオブジェクト管理を前提にするカスタムページアロケーター"></a>第102章 ユーザーによるオブジェクト管理を前提にするカスタムページアロケーター</h2></div></div></div><p>　この項目ではユーザーにファイルマッピングしたページを返すアロケーターの検討をします。</p><p>　プラットフォームはページは最低でも 4096 バイトぐらいになると考えてください。</p><p>　さらに割り当てられる 2 番目に小さいサイズは 8192 バイトというように、ページサイズの倍数しか割り当てられないです。</p><pre class="programlisting"> 14 #define PAGE_SIZE 4096
+ 15 #define PAGE_ROUND_UP(x) ( x + PAGE_SIZE-1)  &amp; (~(PAGE_SIZE-1))</pre><p>　PAGE_ROUND_UP マクロを使って次のページサイズをチェックしてみると良いでしょう。</p><p>　ユーザーアプリケーション側にこれを返す場合は、オブジェクトのライフタイムの管理はユーザーアプリケーションでやってもらうしかなさそうです。</p><p>　つまり construct() や destroy() は実装することがあっても、たぶん使わないと思います。</p><p>　では実装例を見てみましょうかね。</p><pre class="programlisting">  1 #include &lt;memory&gt;
+  2 #include &lt;string&gt;
+  3 #include &lt;map&gt;
+  4 #include &lt;cerrno&gt;
+  5 #include &lt;vector&gt;
+  6 #include &lt;cmath&gt;
+  7 #include &lt;cstdio&gt;
+  8 #include &lt;fcntl.h&gt;
+  9 #include &lt;sys/mman.h&gt;
+ 10 #include &lt;sys/stat.h&gt;
+ 11 #include &lt;sys/types.h&gt;
+ 12 #include &lt;cstring&gt;
+ 13 #include &lt;unistd.h&gt;
+ 14
+ 15 #define PAGE_SIZE 4096
+ 16 #define PAGE_ROUND_UP(x) ( x + PAGE_SIZE-1)  &amp; (~(PAGE_SIZE-1))
+ 17
+ 18 class shared_mmap_allocator {
+ 19
+ 20   typedef std::size_t size_type;
+ 21   typedef std::map&lt;void*, size_type&gt; size_map_t;
+ 22   typedef std::map&lt;size_type, std::vector&lt;void*&gt;&gt; free_list_t;
+ 23
+ 24 public:
+ 25
+ 26   shared_mmap_allocator() = delete;
+ 27   shared_mmap_allocator(int fd) : M_fd_(fd)
+ 28   {}
+ 29
+ 30   ~shared_mmap_allocator() {
+ 31     for(auto&amp; addr : M_size_map_){
+ 32       std::printf("%p\n",addr.first);
+ 33       if(munmap(addr.first,addr.second) == -1){
+ 34         std::perror("munmap failed");
+ 35       }
+ 36     }
+ 37     close(M_fd_);
+ 38   }
+ 39
+ 40   void* allocate(size_t n) {
+ 41
+ 42     size_t page_multiple  = n * M_page_size_;
+ 43     std::printf("page_multiple = %lu\n",page_multiple);
+ 44
+ 45     auto&amp; free_chunks = M_free_list_[page_multiple];
+ 46     if (!free_chunks.empty()) {
+ 47       void* pblock = free_chunks.back();
+ 48       free_chunks.pop_back();
+ 49       return pblock;
+ 50     }
+ 51
+ 52     struct stat sb;
+ 53     char buf[page_multiple];
+ 54     std::memset(buf,0,page_multiple);
+ 55
+ 56     off_t seek_end_offset = lseek(M_fd_, 0, SEEK_END); //ファイルの終端
+ 57
+ 58     write(M_fd_,buf,page_multiple);
+ 59     if(fstat(M_fd_,&amp;sb) == -1){
+ 60       std::perror("stat");
+ 61       exit(1);
+ 62     }
+ 63
+ 64     lseek(M_fd_,-page_multiple,SEEK_END);
+ 65
+ 66     void* pblock = mmap(
+ 67       NULL,
+ 68       sb.st_size,
+ 69       PROT_READ | PROT_WRITE,
+ 70       MAP_SHARED,
+ 71       M_fd_,
+ 72       seek_end_offset); //ファイル終端からマッピング開始
+ 73     if(pblock == MAP_FAILED){
+ 74       std::perror("mmap");
+ 75       exit(1);
+ 76     }
+ 77     M_size_map_[pblock] = page_multiple;
+ 78     return pblock;
+ 79   }
+ 80
+ 81   void deallocate(void* p, size_t ) {
+ 82     auto chunk_size = M_size_map_[(void*)p];
+ 83     M_free_list_[chunk_size].push_back((void*)p);
+ 84   }
+ 85
+ 86  private:
+ 87   const int M_page_size_ = sysconf(_SC_PAGE_SIZE);
+ 88   int M_fd_;
+ 89   size_map_t M_size_map_;
+ 90   free_list_t M_free_list_;
+ 91 };
+ 92
+ 93
+ 94 template&lt;typename T&gt;
+ 95 class block_allocator {
+ 96   using value_type = T;
+ 97   using pointer = T*;
+ 98   using const_pointer = const T*;
+ 99   using reference = T&amp;;
+100   using const_reference = const T&amp;;
+101   using size_type = std::size_t;
+102   using difference_type = off_t;
+103
+104 public:
+105   template &lt;class U&gt;
+106   struct rebind {
+107     typedef block_allocator&lt;U&gt; other;
+108   };
+109
+110   static block_allocator* create_allocator(std::string filename) {
+111     int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
+112     if (fd == -1) {
+113       return nullptr;
+114     }
+115     return new block_allocator(fd);
+116   }
+117
+118   block_allocator(int fd) : M_shared_mmap_allocator_(fd)
+119   {}
+120
+121   template &lt;class U&gt;
+122   block_allocator(const block_allocator&lt;U&gt;&amp; ){}
+123
+124   pointer allocate(size_t n) {
+125     return reinterpret_cast&lt;pointer&gt;(M_shared_mmap_allocator_.allocate(n));
+126   }
+127
+128   void deallocate(void *p, size_t n){
+129     M_shared_mmap_allocator_.deallocate(p,n);
+130   }
+131
+132   void construct(pointer p, const_reference val) {
+133     new ((void*)p) T(val);
+134   }
+135
+136   void destroy(pointer p) { p-&gt;~T(); }
+137
+138   template &lt;class U, class... Args&gt;
+139   void construct(U* p, Args&amp;&amp;... args) {
+140     ::new ((void*)p) U(std::forward&lt;Args&gt;(args)...);
+141   }
+142
+143   template &lt;class U&gt;
+144   void destroy(U* p) {
+145     p-&gt;~U();
+146   }
+147
+148 private:
+149   shared_mmap_allocator M_shared_mmap_allocator_;
+150 };
+151
+152 int main()
+153 {
+154   block_allocator&lt;void*&gt;* ba = block_allocator&lt;void*&gt;::create_allocator("abc.txt");
+155   void* ptr = ba-&gt;allocate(2);
+156   char* iptr = static_cast&lt;char*&gt;(ptr);
+157   for(int i = 0; i &lt; 8; ++i){
+158     iptr[i] = i;
+159   }
+160   iptr[8] = '\0';
+161   ba-&gt;deallocate(ptr,2);
+162   void* nptr;
+163   nptr = ba-&gt;allocate(1);
+164   char* cptr = static_cast&lt;char*&gt;(nptr);
+165   for(int i = 0; i &lt; 8; ++i) {
+166     cptr[i] = 10 + i;
+167   }
+168   ba-&gt;deallocate(nptr,1);
+169   delete ba;
+170
+171   int fd = open("abc.txt",O_RDONLY);
+172   char buf[10000];
+173   read(fd,buf,10000);
+174
+175   for(int i = 0; i &lt; 8; ++i){
+176     std::printf("buf[%d] = %d\n",i,buf[i]);
+177   }
+178   for(int i = 8192; i &lt; 8200; ++i){
+179     std::printf("buf[%d] = %d\n",i,buf[i]);
+180   }
+181   return 0;
+182 }</pre><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ g++ main.cpp -std=c++17 -g
+$ ./a.out
+page_multiple = 8192
+page_multiple = 4096
+0x7f0efa80a000
+0x7f0efa80d000
+buf[0] = 0
+buf[1] = 1
+buf[2] = 2
+buf[3] = 3
+buf[4] = 4
+buf[5] = 5
+buf[6] = 6
+buf[7] = 7
+buf[8192] = 10
+buf[8193] = 11
+buf[8194] = 12
+buf[8195] = 13
+buf[8196] = 14
+buf[8197] = 15
+buf[8198] = 16
+buf[8199] = 17</pre><p>
+</p><p>　まずはユーザーインターフェースと内部実装のクラスは分けることにします。</p><p>　インスタンスについてはデフォルトコンストラクターは使わずに create_allocator() を作って行います。</p><pre class="programlisting"> 94 template&lt;typename T&gt;
+ 95 class block_allocator {
+
+ //  中略
+
+110   static block_allocator* create_allocator(std::string filename) {
+111     int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
+112     if (fd == -1) {
+113       return nullptr;
+114     }
+115     return new block_allocator(fd);
+116   }
+117
+118   block_allocator(int fd) : M_shared_mmap_allocator_(fd)
+119   {}
+
+ //  中略
+
+148 private:
+149   shared_mmap_allocator M_shared_mmap_allocator_;
+150 };</pre><p>　fd は open() 関数で取得したファイル記述子となります。</p><p>　後は block_allocator クラステンプレートのインスタンスから、shared_mmap_allocator の関数を呼び出す感じです。</p><p>　shared_mmap_allocator は以下のようにコピーコンストラクターだけ定義しておきます。</p><pre class="programlisting"> 18 class shared_mmap_allocator {
+ 19
+ 20   typedef std::size_t size_type;
+ 21   typedef std::map&lt;void*, size_type&gt; size_map_t;
+ 22   typedef std::map&lt;size_type, std::vector&lt;void*&gt;&gt; free_list_t;
+ 23
+ 24 public:
+ 25
+ 26   shared_mmap_allocator() = delete;
+ 27   shared_mmap_allocator(int fd) : M_fd_(fd)
+ 28   {}
+
+ //  中略
+
+ 86  private:
+ 87   const int M_page_size_ = sysconf(_SC_PAGE_SIZE);
+ 88   int M_fd_;
+ 89   size_map_t M_size_map_;
+ 90   free_list_t M_free_list_;
+ 91 };</pre><p>　このアロケーターはページをユーザーに返すのでブロックサイズではなく、ページサイズ M_page_size_ を基準にメモリーの割り当てをします。</p><pre class="programlisting"> 87   const int M_page_size_ = sysconf(_SC_PAGE_SIZE);</pre><p>　sysconf() 関数によってシステムのページサイズを取得しておきます。</p><p>　割り当てサイズはこのページサイズの倍数にするために使います。</p><p>　では allocate() 関数を見てみましょう。</p><pre class="programlisting"> 40   void* allocate(size_t n) {
+ 41
+ 42     size_t page_multiple  = n * M_page_size_;
+ 43     std::printf("page_multiple = %lu\n",page_multiple);
+ 44
+ 45     auto&amp; free_chunks = M_free_list_[page_multiple];
+ 46     if (!free_chunks.empty()) {
+ 47       void* pblock = free_chunks.back();
+ 48       free_chunks.pop_back();
+ 49       return pblock;
+ 50     }
+ 51
+ 52     struct stat sb;
+ 53     char buf[page_multiple];
+ 54     std::memset(buf,0,page_multiple);
+ 55
+ 56     off_t seek_end_offset = lseek(M_fd_, 0, SEEK_END); //ファイルの終端
+ 57
+ 58     write(M_fd_,buf,page_multiple);
+ 59     if(fstat(M_fd_,&amp;sb) == -1){
+ 60       std::perror("stat");
+ 61       exit(1);
+ 62     }
+ 63
+ 64     lseek(M_fd_,-page_multiple,SEEK_END);
+ 65
+ 66     void* pblock = mmap(
+ 67       NULL,
+ 68       sb.st_size,
+ 69       PROT_READ | PROT_WRITE,
+ 70       MAP_SHARED,
+ 71       M_fd_,
+ 72       seek_end_offset); //ファイル終端からマッピング開始
+ 73     if(pblock == MAP_FAILED){
+ 74       std::perror("mmap");
+ 75       exit(1);
+ 76     }
+ 77     M_size_map_[pblock] = page_multiple;
+ 78     return pblock;
+ 79   }
+ 80
+ 81   void deallocate(void* p, size_t ) {
+ 82     auto chunk_size = M_size_map_[(void*)p];
+ 83     M_free_list_[chunk_size].push_back((void*)p);
+ 84   }</pre><p>　page_multiple はページサイズの倍数となる割り当てサイズです。</p><pre class="programlisting"> 52     struct stat sb;
+ 53     char buf[page_multiple];
+ 54     std::memset(buf,0,page_multiple);</pre><p>　ここでは要素が 0 の buf[] 配列を初期化していますね。</p><p>　これはファイルを初期化するためのバッファーとして、すぐ後に使います。</p><pre class="programlisting"> 56     off_t seek_end_offset = lseek(M_fd_, 0, SEEK_END); //ファイルの終端</pre><p>　seek_end_offset はファイルの終端オフセット（位置）のことですね。</p><p>　なぜファイルの終端の位置が知りたいかというと、そこに新たにファイルマッピングをするからです。</p><p>　それでオフセットはあることはあるんですが、キレイな状態でマッピングをするために write() 関数で buf[] を書き込みます。</p><pre class="programlisting"> 58     write(M_fd_,buf,page_multiple);
+ 59     if(fstat(M_fd_,&amp;sb) == -1){
+ 60       std::perror("stat");
+ 61       exit(1);
+ 62     }
+ 63
+ 64     lseek(M_fd_,-page_multiple,SEEK_END);</pre><p>　書き込み後にすぐにファイルオフセットを lseek() 関数で巻き戻します。</p><p>　mmap() をしてファイルを書き込む段階で seek_end_offset にしておきます。</p><pre class="programlisting"> 66     void* pblock = mmap(
+ 67       NULL,
+ 68       sb.st_size,
+ 69       PROT_READ | PROT_WRITE,
+ 70       MAP_SHARED,
+ 71       M_fd_,
+ 72       seek_end_offset); //ファイル終端からマッピング開始
+ 73     if(pblock == MAP_FAILED){
+ 74       std::perror("mmap");
+ 75       exit(1);
+ 76     }</pre><p>　mmap() の引数は前の項目で説明している通りですが、マッピングの開始点は seek_end_offset になります。</p><p>　それで動作は以下のコードで確認します。</p><pre class="programlisting">152 int main()
+153 {
+154   block_allocator&lt;void*&gt;* ba = block_allocator&lt;void*&gt;::create_allocator("abc.txt");
+155   void* ptr = ba-&gt;allocate(2);
+156   char* iptr = static_cast&lt;char*&gt;(ptr);
+157   for(int i = 0; i &lt; 8; ++i){
+158     iptr[i] = i;
+159   }
+160   iptr[8] = '\0';
+161   ba-&gt;deallocate(ptr,2);
+162   void* nptr;
+163   nptr = ba-&gt;allocate(1);
+164   char* cptr = static_cast&lt;char*&gt;(nptr);
+165   for(int i = 0; i &lt; 8; ++i) {
+166     cptr[i] = 10 + i;
+167   }
+168   ba-&gt;deallocate(nptr,1);
+169   delete ba;
+170
+171   int fd = open("abc.txt",O_RDONLY);
+172   char buf[10000];
+173   read(fd,buf,10000);
+174
+175   for(int i = 0; i &lt; 8; ++i){
+176     std::printf("buf[%d] = %d\n",i,buf[i]);
+177   }
+178   for(int i = 8192; i &lt; 8200; ++i){
+179     std::printf("buf[%d] = %d\n",i,buf[i]);
+180   }
+181   return 0;
+182 }</pre><p>　考え方としては create_allocator() 関数で abc.txt というファイルを開き、ファイル記述子を shared_mmap_allocator クラステンプレートのコンストラクターの引数として使います。</p><pre class="programlisting">154   block_allocator&lt;void*&gt;* ba = block_allocator&lt;void*&gt;::create_allocator("abc.txt");</pre><p>　次にページ 2 個分をポインター ptr 割り当てます。</p><p>　そして iptr という文字を指すポインターにキャストして、データを設定します。</p><pre class="programlisting">155   void* ptr = ba-&gt;allocate(2);
+156   char* iptr = static_cast&lt;char*&gt;(ptr);
+157   for(int i = 0; i &lt; 8; ++i){
+158     iptr[i] = i;
+159   }</pre><p>　さらにページ 1 個分をポインター nptr に割り当てます。</p><p>　これもキャストをしてデータを設定します。</p><pre class="programlisting">162   void* nptr;
+163   nptr = ba-&gt;allocate(1);
+164   char* cptr = static_cast&lt;char*&gt;(nptr);
+165   for(int i = 0; i &lt; 8; ++i) {
+166     cptr[i] = 10 + i;
+167   }</pre><p>　アロケーターのインスタンスは delete で解放します。</p><pre class="programlisting">169   delete ba;</pre><p>　これによってデストラクターがコールされます。</p><pre class="programlisting"> 30   ~shared_mmap_allocator() {
+ 31     for(auto&amp; addr : M_size_map_){
+ 32       std::printf("%p\n",addr.first);
+ 33       if(munmap(addr.first,addr.second) == -1){
+ 34         std::perror("munmap failed");
+ 35       }
+ 36     }
+ 37     close(M_fd_);
+ 38   }</pre><p>　割り当て済みのデータを M_size_map_ から取り出して munmap でマップを解除します。</p><p>　解除時にはマッピングした領域に対して変更したデータが反映されます。</p><p>　ついでですがアドレスを出力し、ファイル記述子をクローズします。</p><pre class="programlisting">0x7f0efa80a000
+0x7f0efa80d000</pre><p>　最後にファイルを読みこんで、ファイルに対してデータが更新されたかチェックします。</p><pre class="programlisting">171   int fd = open("abc.txt",O_RDONLY);
+172   char buf[10000];
+173   read(fd,buf,10000);
+174
+175   for(int i = 0; i &lt; 8; ++i){
+176     std::printf("buf[%d] = %d\n",i,buf[i]);
+177   }
+178   for(int i = 8192; i &lt; 8200; ++i){
+179     std::printf("buf[%d] = %d\n",i,buf[i]);
+180   }</pre><p>　これの出力は以下の通りです。</p><pre class="programlisting">buf[0] = 0
+buf[1] = 1
+buf[2] = 2
+buf[3] = 3
+buf[4] = 4
+buf[5] = 5
+buf[6] = 6
+buf[7] = 7
+buf[8192] = 10
+buf[8193] = 11
+buf[8194] = 12
+buf[8195] = 13
+buf[8196] = 14
+buf[8197] = 15
+buf[8198] = 16
+buf[8199] = 17</pre><p>　このようにメモリー内で設定した情報がファイルに反映されています。</p><p>　しかしユーザーアプリケーション側の方が複雑な気がするので、インターフェースとしてはいまいちです。</p><p>　実のところ、設計面では明らかに直せる点もあるので、読者さんも時間があったら直して見ると良い練習になるかもしれないですね。</p><p>　まあ筆者は時間ないっすけどね…</p><p>　(´・ω・｀)</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pt13.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt13.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch103.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

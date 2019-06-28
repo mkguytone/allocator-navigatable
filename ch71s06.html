@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>71.6. file (カーネル)</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch71.html" title="第71章 Linux のファイルシステム" /><link rel="prev" href="ch71s05.html" title="71.5. dentry (カーネル)" /><link rel="next" href="ch72.html" title="第72章 stat 構造体" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch71s05.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch72.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_file_カーネル"></a>71.6. file (カーネル)</h2></div></div></div><p>　file オブジェクトは Linux や POSIX 系のファイル関数で扱うファイルを抽象化したものです。</p><p>　プロセスが開くファイルの抽象化であり、ファイル記述子をまとめたテーブルである fdtable のエントリーになります。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/fdtable.h
+ 26 struct fdtable {
+ 27   unsigned int max_fds;
+ 28   struct file __rcu **fd;      /* current fd array */
+ 29   unsigned long *close_on_exec;
+ 30   unsigned long *open_fds;
+ 31   unsigned long *full_fds_bits;
+ 32   struct rcu_head rcu;
+ 33 };
+//割愛
+ 45 /*
+ 46  * Open file table structure
+ 47  */
+ 48 struct files_struct {
+ 49   /*
+ 50    * read mostly part
+ 51    */
+ 52   atomic_t count;
+ 53   bool resize_in_progress;
+ 54   wait_queue_head_t resize_wait;
+ 55
+ 56   struct fdtable __rcu *fdt;
+ 57   struct fdtable fdtab;
+ 58   /*
+ 59    * written part on a separate cache line in SMP
+ 60    */
+ 61   spinlock_t file_lock ____cacheline_aligned_in_smp;
+ 62   unsigned int next_fd;
+ 63   unsigned long close_on_exec_init[1];
+ 64   unsigned long open_fds_init[1];
+ 65   unsigned long full_fds_bits_init[1];
+ 66   struct file __rcu * fd_array[NR_OPEN_DEFAULT];
+ 67 };
+ 68</pre><p>　file オブジェクトの宣言は以下のようになります。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/fs.h
+ 859 struct file {
+ 860   union {
+ 861     struct llist_node fu_llist;
+ 862     struct rcu_head   fu_rcuhead;
+ 863   } f_u;
+ 864   struct path   f_path;
+ 865   struct inode    *f_inode; /* cached value */
+ 866   const struct file_operations  *f_op;
+ 867
+ 868   /*
+ 869    * Protects f_ep_links, f_flags.
+ 870    * Must not be taken from IRQ context.
+ 871    */
+ 872   spinlock_t    f_lock;
+ 873   enum rw_hint    f_write_hint;
+ 874   atomic_long_t   f_count;
+ 875   unsigned int    f_flags;
+ 876   fmode_t     f_mode;
+ 877   struct mutex    f_pos_lock;
+ 878   loff_t      f_pos;
+ 879   struct fown_struct  f_owner;
+ 880   const struct cred *f_cred;
+ 881   struct file_ra_state  f_ra;
+ 882
+ 883   u64     f_version;
+ 884 #ifdef CONFIG_SECURITY
+ 885   void      *f_security;
+ 886 #endif
+ 887   /* needed for tty driver, and maybe others */
+ 888   void      *private_data;
+ 889
+ 890 #ifdef CONFIG_EPOLL
+ 891   /* Used by fs/eventpoll.c to link all the hooks to this file */
+ 892   struct list_head  f_ep_links;
+ 893   struct list_head  f_tfile_llink;
+ 894 #endif /* #ifdef CONFIG_EPOLL */
+ 895   struct address_space  *f_mapping;
+ 896   errseq_t    f_wb_err;
+ 897 } __randomize_layout
+ 898   __attribute__((aligned(4)));  /* lest something weird decides that 2 is OK */</pre><p>　file オブジェクトの操作には file_operations オブジェクトに宣言された関数ポインターを使います。</p><pre class="programlisting">1713 struct file_operations {
+1714   struct module *owner;
+1715   loff_t (*llseek) (struct file *, loff_t, int);
+1716   ssize_t (*read) (struct file *, char __user *, size_t, loff_t *);
+1717   ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
+1718   ssize_t (*read_iter) (struct kiocb *, struct iov_iter *);
+1719   ssize_t (*write_iter) (struct kiocb *, struct iov_iter *);
+1720   int (*iterate) (struct file *, struct dir_context *);
+1721   int (*iterate_shared) (struct file *, struct dir_context *);
+1722   __poll_t (*poll) (struct file *, struct poll_table_struct *);
+1723   long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
+1724   long (*compat_ioctl) (struct file *, unsigned int, unsigned long);
+1725   int (*mmap) (struct file *, struct vm_area_struct *);
+1726   unsigned long mmap_supported_flags;
+1727   int (*open) (struct inode *, struct file *);
+1728   int (*flush) (struct file *, fl_owner_t id);
+1729   int (*release) (struct inode *, struct file *);
+1730   int (*fsync) (struct file *, loff_t, loff_t, int datasync);
+1731   int (*fasync) (int, struct file *, int);
+1732   int (*lock) (struct file *, int, struct file_lock *);
+1733   ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
+1734   unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned
+1735   int (*check_flags)(int);
+1736   int (*flock) (struct file *, int, struct file_lock *);
+1737   ssize_t (*splice_write)(struct pipe_inode_info *, struct file *, loff_t *, size_t, unsig
+1738   ssize_t (*splice_read)(struct file *, loff_t *, struct pipe_inode_info *, size_t, unsign
+1739   int (*setlease)(struct file *, long, struct file_lock **, void **);
+1740   long (*fallocate)(struct file *file, int mode, loff_t offset,
+1741         loff_t len);
+1742   void (*show_fdinfo)(struct seq_file *m, struct file *f);
+1743 #ifndef CONFIG_MMU
+1744   unsigned (*mmap_capabilities)(struct file *);
+1745 #endif
+1746   ssize_t (*copy_file_range)(struct file *, loff_t, struct file *,
+1747       loff_t, size_t, unsigned int);
+1748   int (*clone_file_range)(struct file *, loff_t, struct file *, loff_t,
+1749       u64);
+1750   ssize_t (*dedupe_file_range)(struct file *, u64, u64, struct file *,
+1751       u64);
+1752 } __randomize_layout;</pre><p>　この中には mmap 関数も含まれています。</p><pre class="programlisting">1713 struct file_operations {
+1725   int (*mmap) (struct file *, struct vm_area_struct *);
+1752 } __randomize_layout;</pre><p>　この mmap 関数はカーネル側（デバイスドライバー） の処理を担当しているので mmap システムコールの宣言とは随分違いますね。</p><pre class="programlisting">#include &lt;sys/mman.h&gt;
+void *mmap(void *addr, size_t length, int prot, int flags,
+                  int fd, off_t offset);</pre><p>　まあ file_operations の中の mmap は（ブロック）デバイス空間とユーザー空間のマッピングとなりますんで、ファイル記述子が呼び出しに必要となっています。</p><p>　さらに引数の vm_area_struct へのポインターはどの仮想アドレスにマップできるかを指定させてくれます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch71s05.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch71.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch72.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

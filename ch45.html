@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第45章 malloc() フリーチャンクの挙動</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch44.html" title="第44章 tcache" /><link rel="next" href="ch46.html" title="第46章 malloc.c の内部マクロ" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch44.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch46.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_malloc_フリーチャンクの挙動"></a>第45章 malloc() フリーチャンクの挙動</h2></div></div></div><p>　malloc() の内部実装はかなり複雑にできてます。</p><p>　「ちょこっとデバッグしたよーー　＼(<sup>o</sup>)／」</p><p>　とか言うのは簡単なんですが、特定のビンがいつ使われたかシミュレーションしたいとかやってる人（自分含む）見ると、草はえますね…（笑えるの意味です…）もしくは毛が抜けそう…</p><p>　(´・ω・｀)</p><p>　言葉が適当かどうかは分かりませんがダイナミックな動きをするので、特定の状況を再現しようとするのは極めて難しいです。</p><p>　(´；ω；｀)</p><p>　でも筆者が試す限り動作したシミュレーションの結果をご報告するぐらいならできます…</p><p><strong>main.cpp. </strong>
+</p><pre class="programlisting">  1 #include &lt;stdlib.h&gt;
+  2 #include &lt;stdio.h&gt;
+  3
+  4 typedef struct node_ {
+  5   void* data;
+  6 } node;
+  7
+  8 node* allocate() {
+  9   return malloc(sizeof(node));
+ 10 }
+ 11
+ 12 node* allocate8() {
+ 13   return malloc(sizeof(node)*8);
+ 14 }
+ 15
+ 16 node* allocate256() {
+ 17   return malloc(sizeof(node)*256);
+ 18 }
+ 19
+ 20 void bp() {}
+ 21
+ 22 int main() {
+ 23   node *nodep[4096];
+ 24   node *node8p[4096];
+ 25   node *node256p[4096];
+ 26   int i;
+ 27
+ 28   for(i = 0; i &lt; 4096; i++){
+ 29     nodep[i] = allocate();
+ 30     node8p[i] = allocate8();
+ 31     node256p[i] = allocate256();
+ 32   }
+ 33
+ 34   for(i = 0; i &lt; 200000; i++) {
+ 35     int index = i % 4096;
+ 36     free(nodep[index]);
+ 37     free(node8p[index]);
+ 38     free(node256p[index]);
+ 39     nodep[index] = allocate();
+ 40     node8p[index] = allocate8();
+ 41     node256p[index] = allocate256();
+ 42   }
+ 43
+ 44   for(i = 0; i &lt; 4096; i++){
+ 45     free(nodep[i]);
+ 46     free(node8p[i]);
+ 47     free(node256p[i]);
+ 48   }
+ 49
+ 50   bp();
+ 51
+ 52   return 0;
+ 53 }</pre><p>
+</p><p>　このプログラムは malloc() と free() を何万回も繰り返すだけなんですがファーストビンと未整理ビン（ Unsorted Bin ）にフリーチャンクを入れてきます。</p><pre class="programlisting">$ gcc main.c -g
+(gdb) break bp
+Breakpoint 1 at 0x709: file main.c, line 20.
+(gdb) run
+Starting program:
+
+Breakpoint 1, bp () at main.c:20
+20      void bp() {}
+(gdb) p (&amp;main_arena)-&gt;fastbinsY[0]
+$1 = (mfastbinptr) 0x555555fd59d0
+(gdb) p (&amp;main_arena)-&gt;fastbinsY[1]
+$2 = (mfastbinptr) 0x0
+(gdb) p (&amp;main_arena)-&gt;fastbinsY[2]
+$3 = (mfastbinptr) 0x0
+(gdb) p (&amp;main_arena)-&gt;fastbinsY[3]
+$4 = (mfastbinptr) 0x555555fd59f0
+(gdb) p (&amp;main_arena)-&gt;fastbinsY[3]-&gt;fd
+$5 = (struct malloc_chunk *) 0x555555fd5170
+(gdb) p (&amp;main_arena)-&gt;fastbinsY[3]-&gt;fd-&gt;fd
+$6 = (struct malloc_chunk *) 0x555555fd48f0
+(gdb) p (&amp;main_arena)-&gt;fastbinsY[3]-&gt;fd-&gt;fd-&gt;bk
+$7 = (struct malloc_chunk *) 0x0
+(gdb) p (&amp;main_arena)-&gt;fastbinsY[3]-&gt;fd-&gt;fd-&gt;mchunk_size
+$8 = 81
+(gdb) p (&amp;main_arena)-&gt;bins[0]
+$9 = (mchunkptr) 0x555555fd51c0
+(gdb) p (&amp;main_arena)-&gt;bins[0]-&gt;mchunk_size
+$10 = 2065
+(gdb) p *(&amp;main_arena)-&gt;bins[0]
+$11 = {mchunk_prev_size = 0, mchunk_size = 2065, fd = 0x555555fd4940, bk = 0x7ffff7bcaca0 &lt;main_arena+96&gt;,
+  fd_nextsize = 0x0, bk_nextsize = 0x0}
+(gdb) p *(&amp;main_arena)-&gt;bins[0]-&gt;fd
+$12 = {mchunk_prev_size = 0, mchunk_size = 2065, fd = 0x555555fd40c0, bk = 0x555555fd51c0, fd_nextsize = 0x0,
+  bk_nextsize = 0x0}
+(gdb) p *(&amp;main_arena)-&gt;bins[0]-&gt;fd-&gt;fd
+$13 = {mchunk_prev_size = 0, mchunk_size = 2065, fd = 0x555555fd3840, bk = 0x555555fd4940, fd_nextsize = 0x0,
+  bk_nextsize = 0x0}
+(gdb) p (&amp;main_arena)-&gt;bins[0]-&gt;fd-&gt;bk
+$15 = (struct malloc_chunk *) 0x555555fd51c0</pre><p>　まあ特に何か重要な行があるというわけじゃないですが、情報をまとめておきます。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+fastbinsY[0] にフリーチャンク（ファーストチャンク）がある
+</li><li class="listitem">
+fastbinsY[3] にフリーチャンク（ファーストチャンク）がある
+</li><li class="listitem">
+bins[0] にフリーチャンクがある（双方向リストとして連結されている）
+</li></ul></div><p>　アドレスもヒープ領域にありますし malloc() のシミュレーションとして悪くない結果です。</p><p>　読者も色々とやってみるのは良いですが、時間は有限ですので、気をつけてくださいね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch44.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch46.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

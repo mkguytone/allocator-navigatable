@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第81章 fork() でプライベートアノニマスマッピングをチェック</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt06.html" title="パート VI. mmap" /><link rel="prev" href="ch80.html" title="第80章 fork() でプライベートファイルマッピングのチェック" /><link rel="next" href="ch82.html" title="第82章 fork() で共有ファイルマッピングをチェック" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch80.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch82.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_fork_でプライベートアノニマスマッピングをチェック"></a>第81章 fork() でプライベートアノニマスマッピングをチェック</h2></div></div></div><p>　プライベートアノニマスマッピングは MAP_PRIVATE と MAP_ANONYMOUS を組み合わせたマッピングです。</p><p>　これもファイルマッピング同様に fork() をした場合は Copy-on-Write が適用されます。</p><p><strong>main.c. </strong>
+</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+  2 #include &lt;stdlib.h&gt;
+  3 #include &lt;string.h&gt;
+  4 #include &lt;sys/mman.h&gt;
+  5 #include &lt;sys/stat.h&gt;
+  6 #include &lt;sys/types.h&gt;
+  7 #include &lt;unistd.h&gt;
+  8 #include &lt;fcntl.h&gt;
+  9
+ 10 #define BUF_SIZE 8
+ 11
+ 12 int main()
+ 13 {
+ 14   int i;
+ 15   char *mm;
+ 16
+ 17   mm = mmap(NULL,BUF_SIZE,PROT_WRITE|PROT_READ,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+ 18   if(mm == MAP_FAILED){
+ 19     perror("mmap");
+ 20     exit(1);
+ 21   }
+ 22
+ 23   pid_t id = fork();
+ 24
+ 25   if(id == 0) {
+ 26     for(i = 0; i &lt; BUF_SIZE-1; i++)
+ 27       mm[i] = 'a'+i;
+ 28     mm[BUF_SIZE-1] = '\0';
+ 29
+ 30   } else {
+ 31     for(i = 0; i &lt; BUF_SIZE-1; i++)
+ 32       mm[i] = 'a';
+ 33     mm[BUF_SIZE-1] = '\0';
+ 34   }
+ 35
+ 36   for(i = 0; i &lt; 10; i++)
+ 37     printf("mm[%d] =&gt; %c\n",i,mm[i]);
+ 38
+ 39   if(munmap(mm,BUF_SIZE)==-1){
+ 40     perror("munmap");
+ 41     exit(1);
+ 42   }
+ 43
+ 44   return 0;
+ 45 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+mm[0] =&gt; a
+mm[1] =&gt; a
+mm[2] =&gt; a
+mm[3] =&gt; a
+mm[4] =&gt; a
+mm[5] =&gt; a
+mm[6] =&gt; a
+mm[7] =&gt;
+mm[8] =&gt;
+mm[9] =&gt;
+mm[0] =&gt; a
+mm[1] =&gt; b
+mm[2] =&gt; c
+mm[3] =&gt; d
+mm[4] =&gt; e
+mm[5] =&gt; f
+mm[6] =&gt; g
+mm[7] =&gt;
+mm[8] =&gt;
+mm[9] =&gt;</pre><p>
+</p><p>　MAP_ANONYMOUS ではメモリー間のマッピングなのでファイルは使われません。</p><p>　基本的な挙動は MAP_PRIVATE のファイルマッピングと同じですね。</p><pre class="programlisting"> 17   mm = mmap(NULL,BUF_SIZE,PROT_WRITE|PROT_READ,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+ 18   if(mm == MAP_FAILED){
+ 19     perror("mmap");
+ 20     exit(1);
+ 21   }</pre><p>　この MAP_ANONYMOUS がアノニマスマッピングを指定しています。</p><p>　それと fd は -1 を指定します。</p><p>　fd 引数は通常は無視されるそうですが、一部のプラットフォームは -1 を指定するように作られているらしいので、MAP_ANONYMOUS を指定するときには fd 引数は -1 に設定しておくようにしてくださいね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch80.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt06.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch82.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

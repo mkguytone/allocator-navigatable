@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>71.3. super_block (カーネル)</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch71.html" title="第71章 Linux のファイルシステム" /><link rel="prev" href="ch71s02.html" title="71.2. カーネルソースのアーカイブ" /><link rel="next" href="ch71s04.html" title="71.4. inode (カーネル)" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch71s02.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch71s04.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_super_block_カーネル"></a>71.3. super_block (カーネル)</h2></div></div></div><p>　ファイルシステムの抽象化をしたオブジェクトが super_block です。</p><p>　より正確に言うとファイルシステムに関するグローバル情報を保持しています。</p><p>　全部ではないですがメンバーオブジェクト・メンバー変数はヘッダーから以下のように確認できます。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/fs.h
+1348 struct super_block {
+1349   struct list_head  s_list;   /* Keep this first */
+1350   dev_t     s_dev;    /* search index; _not_ kdev_t */
+1351   unsigned char   s_blocksize_bits;
+1352   unsigned long   s_blocksize;
+1353   loff_t      s_maxbytes; /* Max file size */
+1354   struct file_system_type *s_type;
+1355   const struct super_operations *s_op;
+1356   const struct dquot_operations *dq_op;
+1357   const struct quotactl_ops *s_qcop;
+1358   const struct export_operations *s_export_op;
+1359   unsigned long   s_flags;
+1360   unsigned long   s_iflags; /* internal SB_I_* flags */
+1361   unsigned long   s_magic;
+1362   struct dentry   *s_root;
+1363   struct rw_semaphore s_umount;
+1364   int     s_count;
+1365   atomic_t    s_active;
+1366 #ifdef CONFIG_SECURITY
+1367   void                    *s_security;
+1368 #endif
+1369   const struct xattr_handler **s_xattr;
+1370 #if IS_ENABLED(CONFIG_FS_ENCRYPTION)
+1371   const struct fscrypt_operations *s_cop;
+1372 #endif
+1373   struct hlist_bl_head  s_roots;  /* alternate root dentries for NFS */
+1374   struct list_head  s_mounts; /* list of mounts; _not_ for fs use */
+1375   struct block_device *s_bdev;
+1376   struct backing_dev_info *s_bdi;
+1377   struct mtd_info   *s_mtd;
+1378   struct hlist_node s_instances;
+1379   unsigned int    s_quota_types;  /* Bitmask of supported quota types */
+1380   struct quota_info s_dquot;  /* Diskquota specific options */
+1381
+1382   struct sb_writers s_writers;
+1383
+1384   char      s_id[32]; /* Informational name */
+1385   uuid_t      s_uuid;   /* UUID */
+1386
+1387   void      *s_fs_info; /* Filesystem private info */
+1388   unsigned int    s_max_links;
+1389   fmode_t     s_mode;</pre><p>　蛇足ですがメンバーとして宣言されている super_operations は関数ポインターを宣言しています。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/fs.h
+1824 struct super_operations {
+1825     struct inode *(*alloc_inode)(struct super_block *sb);
+1826   void (*destroy_inode)(struct inode *);
+1827
+1828     void (*dirty_inode) (struct inode *, int flags);
+1829   int (*write_inode) (struct inode *, struct writeback_control *wbc);
+1830   int (*drop_inode) (struct inode *);
+1831   void (*evict_inode) (struct inode *);
+1832   void (*put_super) (struct super_block *);
+1833   int (*sync_fs)(struct super_block *sb, int wait);
+1834   int (*freeze_super) (struct super_block *);
+1835   int (*freeze_fs) (struct super_block *);
+1836   int (*thaw_super) (struct super_block *);
+1837   int (*unfreeze_fs) (struct super_block *);
+1838   int (*statfs) (struct dentry *, struct kstatfs *);
+1839   int (*remount_fs) (struct super_block *, int *, char *);
+1840   void (*umount_begin) (struct super_block *);
+1841
+1842   int (*show_options)(struct seq_file *, struct dentry *);
+1843   int (*show_devname)(struct seq_file *, struct dentry *);
+1844   int (*show_path)(struct seq_file *, struct dentry *);
+1845   int (*show_stats)(struct seq_file *, struct dentry *);
+1846 #ifdef CONFIG_QUOTA
+1847   ssize_t (*quota_read)(struct super_block *, int, char *, size_t, loff_t);
+1848   ssize_t (*quota_write)(struct super_block *, int, const char *, size_t, l
+1849   struct dquot **(*get_dquots)(struct inode *);
+1850 #endif
+1851   int (*bdev_try_to_free_page)(struct super_block*, struct page*, gfp_t);
+1852   long (*nr_cached_objects)(struct super_block *,
+1853           struct shrink_control *);
+1854   long (*free_cached_objects)(struct super_block *,
+1855             struct shrink_control *);
+1856 };</pre><p>　この中で重要なのは inode 系の関数です。</p><p>　覚えておくと良さそうのは alloc_inode / destroy_inode / dirty_inode / write_inode / put_super / sync_fs / statfs あたりでしょうかね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch71s02.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch71.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch71s04.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

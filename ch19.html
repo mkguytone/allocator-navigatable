@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第19章 open / dprintf 関数</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt02.html" title="パート II. Linux (POSIX) のファイル入出力" /><link rel="prev" href="ch18.html" title="第18章 fprintf 関数" /><link rel="next" href="ch20.html" title="第20章 read() / write() 関数" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch18.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch20.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_open_dprintf_関数"></a>第19章 open / dprintf 関数</h2></div></div></div><p>　fprintf は便利っちゃ便利ですが物足りない部分もあります。</p><p>　なぜならファイル記述子（ file descriptor ）の方が便利なことが多いからです。</p><p>　fprintf はあくまでもファイルストリームの指定なので、ファイル記述子をそのまま使うなら dprintf が良いです。</p><pre class="programlisting">#include &lt;stdio.h&gt;
+int dprintf(int fd, const char *format, ...);</pre><p>　この関数は第一引数にファイル記述子、後はフォーマット文字列、入力変数を指定します。</p><p>　printf にファイル記述子がついてるぐらいのもんです。</p><p>　後はファイル記述子は exec コマンドを使って取得するより open 関数を使ったほうが良いです。</p><pre class="programlisting">#include &lt;sys/types.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;fcntl.h&gt;
+int open(const char *pathname, int flags);
+int open(const char *pathname, int flags, mode_t mode);</pre><p>　open 関数には flags と mode という引数がありますね。</p><p>　flags は一般的に設定に使えるフラグパラメーターです。</p><p>　mode はファイルアクセス権限の設定に使えるフラグです。</p><p>　以下はヘッダーファイルから得られる mode の一覧です。</p><div class="table"><a id="idm562"></a><p class="title"><strong>表19.1 mode</strong></p><div class="table-contents"><table class="table" summary="mode" cellpadding="4px" style="border-collapse: collapse;border-top: 3px solid #527bbd; border-bottom: 3px solid #527bbd; border-left: 3px solid #527bbd; border-right: 3px solid #527bbd; "><colgroup><col class="col_1" /><col class="col_2" /><col class="col_3" /></colgroup><thead><tr><th style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top">定数</th><th style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top">8進数値</th><th style="border-bottom: 1px solid #527bbd; " align="left" valign="top">権限</th></tr></thead><tbody><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>S_ISUID</p></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>04000</p></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>ユーザーID設定</p></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>S_ISGID</p></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>02000</p></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>グループID設定</p></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>S_ISVTX</p></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>01000</p></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>スティッキー</p></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>S_IRUSR</p></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>0400</p></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>ユーザー読み込み</p></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>S_IWUSR</p></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>0200</p></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>ユーザー書き込み</p></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>S_IXUSR</p></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>0100</p></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>ユーザー実行</p></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>S_IRGRP</p></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>040</p></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>グループ読み込み</p></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>S_IWGRP</p></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>020</p></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>グループ書き込み</p></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>S_IXGRP</p></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>010</p></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>グループ実行</p></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>S_IROTH</p></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>04</p></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>その他の（グループ以外の全ユーザの）読み込み</p></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>S_IWOTH</p></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>02</p></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><p>その他の（グループ以外の全ユーザの）書き込み</p></td></tr><tr><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><p>S_IXOTH</p></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><p>01</p></td><td style="" align="left" valign="top"><p>その他の（グループ以外の全ユーザの）実行</p></td></tr></tbody></table></div></div><br class="table-break" /><p>　ここらへんは Unix 系の教科書、参考書の権限設定を見ておくと参考になるかもしれませんね。</p><p>　それとファイル記述子が開いたままだと、支障が出るので、閉じるには close 関数を使います。</p><pre class="programlisting">#include &lt;unistd.h&gt;
+int close(int fd);</pre><p>　dprintf を使いこなすための関数は大体こんなもんですかね。</p><p>　では実装例でも見てみましょう。</p><p><strong>main.c. </strong>
+</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+  2 #include &lt;fcntl.h&gt;
+  3 #include &lt;stdlib.h&gt;
+  4 #include &lt;unistd.h&gt;
+  5
+  6 int main(int argc, char **argv)
+  7 {
+  8   int fd;
+  9
+ 10   if(argc != 2) {
+ 11     fprintf(stderr,"ファイル名を指定してください\n");
+ 12     exit(1);
+ 13   }
+ 14   fd = open(argv[1],O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
+ 15   if(fd &lt; 0) {
+ 16     fprintf(stderr,"ファイル記述子を開けませんでした\n");
+ 17     exit(1);
+ 18   }
+ 19   dprintf(fd,"HELLO %s!\n",argv[1]);
+ 20   close(fd);
+ 21   return 0;
+ 22 }</pre><p>
+</p><p>　このコードでは open 関数をフルに使ってるん、そこが理解するときにネックになると思いますが、まずは見ないようにして動かしてみましょう。</p><pre class="programlisting">$ gcc main.c
+$ ./a.out abc.txt
+$ cat abc.txt
+HELLO abc.txt!</pre><p>　このビルドしたプログラムのやっていることをリストにしますね。</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">
+コマンドの第一引数にファイル名を指定する
+</li><li class="listitem">
+open 関数でファイルを新たに作成するか、既に指定したファイル名と同じファイルが存在するなら上書きし、ファイル記述子 fd を開く
+</li><li class="listitem">
+dprintf で HELLO ファイル名! という文字列を開いたファイル記述子 fd に書き込む
+</li><li class="listitem">
+ファイル記述子 fd を閉じる
+</li></ol></div><p>　では解説してきますね。</p><pre class="programlisting"> 14   fd = open(argv[1],O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
+ 15   if(fd &lt; 0) {
+ 16     fprintf(stderr,"ファイル記述子を開けませんでした\n");
+ 17     exit(1);
+ 18   }</pre><p>　open 関数は第一引数がファイル名、第二引数が flags です。新規ファイル作成（または上書き）、読み書き両用、既存のデータがある場合はサイズ 0 に切り捨て（truncation）します。</p><p>　最後の fd 変数のチェックですが、ファイル記述子は取得に成功すると 0 以上の整数値、失敗すると -1 が返ってくるので、失敗した場合は即プログラムを終了します。</p><pre class="programlisting"> 19   dprintf(fd,"HELLO %s!\n",argv[1]);
+ 20   close(fd);</pre><p>　dprintf の第一引数はファイル記述子、第二引数はフォーマット文字列、第三引数以降は変数リストです。</p><p>　「HELLO ファイル名!」というようにファイル記述子に出力します。</p><p>　後はファイル記述子を閉じてプログラムを終了します。</p><p>　最後にファイルの中身の確認は cat コマンドを使います。</p><pre class="programlisting">$ cat abc.txt
+HELLO abc.txt!</pre><p>　このようにファイル名の情報が abc.txt に更新されてます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch18.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt02.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch20.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

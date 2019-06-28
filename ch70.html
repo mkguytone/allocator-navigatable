@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第70章 ページキャッシュ ( struct address_space )</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt05.html" title="パート V. Linux カーネルのメモリーとファイルシステム" /><link rel="prev" href="ch69.html" title="第69章 ページとハードウェア" /><link rel="next" href="ch71.html" title="第71章 Linux のファイルシステム" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch69.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch71.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_ページキャッシュ_struct_address_space"></a>第70章 ページキャッシュ ( struct address_space )</h2></div></div></div><p>　open() / read() 関数の処理は O_DIRECT フラグを設定した場合を除いてページキャッシュというレイヤーに依存しています。</p><p>　紛らわしいですがページキャッシュ内では inode オブジェクトのことをオーナー（所有者）と呼びます。</p><p>　基本やってることは、</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+所有者（ inode ）に対して最適なページの検索
+</li></ul></div><p>　ですね。</p><p>　例えば inode と inode 内のインデックス（添字）から検索する機能ですね。</p><p>　このページキャッシュで最も重要なオブジェクトが struct address_space です。</p><p>　struct address_space は inode オブジェクトのメンバーです。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/fs.h
+ 572 struct inode {
+ 586   struct address_space  *i_mapping;</pre><p>　キャッシュ内の複数のページが同じ inode を参照し、と同時に address_space とリンクされることができます。</p><p>　まあこの辺は inode と address_space 構造体のメンバーが相互にリンクをはっているので明らかだと思います。</p><p>　そして address_space はページ記述子( page )のメンバーでもあります。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/mm_types.h
+ 70 struct page {
+ 88       struct address_space *mapping;
+ 89       pgoff_t index;    /* Our offset within mapping. */</pre><p>　mapping はページを所有する inode の struct address_space を指します。</p><p>　index はオーナー（ inode ）のディスクイメージ内の位置、またはページ内のオフセットです。</p><p>　次は address_space を見てみましょう。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/fs.h
+ 394 struct address_space {
+ 395   struct inode    *host;    /* owner: inode, block_device */
+ 396   struct radix_tree_root  i_pages;  /* cached pages */
+ 397   atomic_t    i_mmap_writable;/* count VM_SHARED mappings */
+ 398   struct rb_root_cached i_mmap;   /* tree of private and shared mappings */
+ 399   struct rw_semaphore i_mmap_rwsem; /* protect tree, count, list */
+ 400   /* Protected by the i_pages lock */
+ 401   unsigned long   nrpages;  /* number of total pages */
+ 402   /* number of shadow or DAX exceptional entries */
+ 403   unsigned long   nrexceptional;
+ 404   pgoff_t     writeback_index;/* writeback starts here */
+ 405   const struct address_space_operations *a_ops; /* methods */
+ 406   unsigned long   flags;    /* error bits */
+ 407   spinlock_t    private_lock; /* for use by the address_space */
+ 408   gfp_t     gfp_mask; /* implicit gfp mask for allocations */
+ 409   struct list_head  private_list; /* for use by the address_space */
+ 410   void      *private_data;  /* ditto */
+ 411   errseq_t    wb_err;
+ 412 } __attribute__((aligned(sizeof(long)))) __randomize_layout;</pre><p>　この中で特に重要な行は以下です。</p><pre class="programlisting"> 396   struct radix_tree_root  i_pages;  /* cached pages */
+ 398   struct rb_root_cached i_mmap;   /* tree of private and shared mappings */</pre><p>　i_pages は基数木で整理されたページ記述子（ struct page ）とマップします。</p><div class="note" style="margin-left: 0; margin-right: 10%;"><h3 class="title">注記</h3><p>　i_pages は「 page_tree 」から変更されたようです。昔のマニュアルや書籍を見ると page_tree となってるものが多いですね。</p></div><p>　rb_root_cached は赤黒木 ( red-black tree) ですね。</p><p>　てなことで i_mmap には vm_area_struct がマップされます。</p><div class="informalfigure"><div class="mediaobject"><img src="img/address_space.png" alt="img/address_space.png" /></div></div><p>　address_space の強さというのは inode オブジェクトへのポインターと、前述した page と file と inode オブジェクトと（メンバーポインターにより）リンクされている点ですかね。</p><p>　まあページの読み書きにキャッシュを使うのは OS やコンピューターのアーキテクチャーからすれば至極当然なので、驚きはないでしょうがね。</p><p>　ちなみに address_space に何らかの操作をするなら address_space_operations オブジェクト内の関数ポインターを見ると良いでしょう。</p><pre class="programlisting"> 334 struct address_space_operations {
+ 335   int (*writepage)(struct page *page, struct writeback_control *wbc);
+ 336   int (*readpage)(struct file *, struct page *);
+ 337
+ 338   /* Write back some dirty pages from this mapping. */
+ 339   int (*writepages)(struct address_space *, struct writeback_control *);
+ 340
+ 341   /* Set a page dirty.  Return true if this dirtied it */
+ 342   int (*set_page_dirty)(struct page *page);
+ 343
+ 344   int (*readpages)(struct file *filp, struct address_space *mapping,
+ 345       struct list_head *pages, unsigned nr_pages);
+ 346
+ 347   int (*write_begin)(struct file *, struct address_space *mapping,
+ 348         loff_t pos, unsigned len, unsigned flags,
+ 349         struct page **pagep, void **fsdata);
+ 350   int (*write_end)(struct file *, struct address_space *mapping,
+ 351         loff_t pos, unsigned len, unsigned copied,
+ 352         struct page *page, void *fsdata);
+ 353
+ 354   /* Unfortunately this kludge is needed for FIBMAP. Don't use it */
+ 355   sector_t (*bmap)(struct address_space *, sector_t);
+ 356   void (*invalidatepage) (struct page *, unsigned int, unsigned int);
+ 357   int (*releasepage) (struct page *, gfp_t);
+ 358   void (*freepage)(struct page *);
+ 359   ssize_t (*direct_IO)(struct kiocb *, struct iov_iter *iter);
+ 360   /*
+ 361    * migrate the contents of a page to the specified target. If
+ 362    * migrate_mode is MIGRATE_ASYNC, it must not block.
+ 363    */
+ 364   int (*migratepage) (struct address_space *,
+ 365       struct page *, struct page *, enum migrate_mode);
+ 366   bool (*isolate_page)(struct page *, isolate_mode_t);
+ 367   void (*putback_page)(struct page *);
+ 368   int (*launder_page) (struct page *);
+ 369   int (*is_partially_uptodate) (struct page *, unsigned long,
+ 370           unsigned long);
+ 371   void (*is_dirty_writeback) (struct page *, bool *, bool *);
+ 372   int (*error_remove_page)(struct address_space *, struct page *);
+ 373
+ 374   /* swapfile support */
+ 375   int (*swap_activate)(struct swap_info_struct *sis, struct file *file,
+ 376         sector_t *span);
+ 377   void (*swap_deactivate)(struct file *file);
+ 378 };</pre><p>　 wirtepages とか readpages とか明らかにページと関係する名前の関数ポインターが宣言されてますよね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch69.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt05.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch71.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

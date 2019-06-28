@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第40章 ビンの初期化</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch39.html" title="第39章 ビンのチャンク連結" /><link rel="next" href="ch41.html" title="第41章 未整理チャンク（ Unsorted Chunk ）のマクロ" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch39.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch41.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_ビンの初期化"></a>第40章 ビンの初期化</h2></div></div></div><p>　ビンの初期化は malloc_init_state() 関数で行われます。</p><p>　以下がソースとなりますね。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">1800 /*
+1801    Initialize a malloc_state struct.
+1802
+1803    This is called from ptmalloc_init () or from _int_new_arena ()
+1804    when creating a new arena.
+1805  */
+1806
+1807 static void
+1808 malloc_init_state (mstate av)
+1809 {
+1810   int i;
+1811   mbinptr bin;
+1812
+1813   /* Establish circular links for normal bins */
+1814   for (i = 1; i &lt; NBINS; ++i)
+1815     {
+1816       bin = bin_at (av, i);
+1817       bin-&gt;fd = bin-&gt;bk = bin;
+1818     }
+1819
+1820 #if MORECORE_CONTIGUOUS
+1821   if (av != &amp;main_arena)
+1822 #endif
+1823   set_noncontiguous (av);
+1824   if (av == &amp;main_arena)
+1825     set_max_fast (DEFAULT_MXFAST);
+1826   atomic_store_relaxed (&amp;av-&gt;have_fastchunks, false);
+1827
+1828   av-&gt;top = initial_top (av);
+1829 }</pre><p>
+</p><p>　コメントに書いてますが ptmalloc_init() または _int_new_arena() をコールする際に使用されるらしいです。</p><p>　bin_at() 関数からビンを指すポンターを取得して、そこから fd と bk ポインターを初期化しています。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch39.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch41.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第73章 mmap の使い方</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt06.html" title="パート VI. mmap" /><link rel="prev" href="pt06.html" title="パート VI. mmap" /><link rel="next" href="ch74.html" title="第74章 マルチタスクで使えると共有メモリーオブジェクト" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="pt06.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch74.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_mmap_の使い方"></a>第73章 mmap の使い方</h2></div></div></div><p>　mmap はシステムプログラミングの本で良く出てきたり、C言語が得意なハッカーのブログ等に掲載されたソースコードで良く見る機会があると思います。</p><p>　mmap は高度に見えるかもしれませんが、あまり深く考えずにファイルシステムとメモリー領域をマッピングしてくれる関数と考えるぐらいで大丈夫です。</p><p>　宣言は以下のようになります。</p><pre class="programlisting">#include &lt;sys/mman.h&gt;
+void *mmap(void * addr , size_t length , int prot , int flags , int fd , off_t offset );
+int munmap(void *addr, size_t length);</pre><p>　mmap 関数は void* 型を返します。</p><p>　まあこれはどんな型でも型変換で対応できるってことです。</p><p>　そして munmap はマップを解除する関数です。munmap の引数 length は解除したいデータ範囲のサイズです。</p><p>　ちなみに close でファイル記述子を閉じてもマップした領域がキャンセルされるわけではないので、意外に重要だったりします。</p><p>　mmap 関数の引数は以下のような感じになりますね。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+addr
+</span></dt><dd>
+マップ先のアドレス、NULL を指定すると新しい領域、それ以外は mmap がマッピングするアドレスのヒントにする
+</dd><dt><span class="term">
+length
+</span></dt><dd>
+マップしたい領域の長さを指定。
+</dd><dt><span class="term">
+prot
+</span></dt><dd>
+マップの保護レベルを指定
+</dd><dt><span class="term">
+flags
+</span></dt><dd>
+変更した結果が他のプロセスから見えるかを指定（ mmap の設定パラメーターも指定可能）
+</dd><dt><span class="term">
+fd
+</span></dt><dd>
+ファイル記述子を指定
+</dd><dt><span class="term">
+offset
+</span></dt><dd>
+開始点となるファイルオフセット（ファイルマッピングの場合）。ページサイズの倍数とする制限がある
+</dd></dl></div><p>　これらの引数で特に厄介なのが offset です。</p><p>　offset はマップしする領域の開始オフセットですが、これはページサイズの倍数で指定される必要があります。</p><div class="note" style="margin-left: 0; margin-right: 10%;"><h3 class="title">注記</h3><p>　ページサイズは OS のビルド設定によって変動するため、問題を回避するためにランタイムで取得すべきとされています。</p><p>　その際に使うのが sysconf 関数です。</p><pre class="programlisting">#include &lt;unistd.h&gt;
+long sysconf (int name);</pre><p>　name 変数にはマクロを指定するのですが、以下のようにできます。</p><p><strong>length. </strong>
+</p><pre class="programlisting">long page_size = sysconf (_SC_PAGESIZE);</pre><p>
+</p><p>　まあ大したことじゃないですが、ページサイズの取得をやってみましょう。</p><pre class="programlisting">  1 #include &lt;unistd.h&gt;
+  2 #include &lt;stdio.h&gt;
+  3
+  4 int main()
+  5 {
+  6   long page_size = sysconf(_SC_PAGESIZE);
+  7   printf("%ld\n",page_size);
+  8   return 0;
+  9 }</pre><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+4096</pre><p>
+</p><p>　結果は 4KB でしたね。</p></div><p>　もうひとつ厄介な引数は proto です。</p><p>　保護レベルには 4 種類のマクロがあるので、それを使います。</p><div class="table"><a id="idm3776"></a><p class="title"><strong>表73.1 メモリー保護（ prot ）</strong></p><div class="table-contents"><table class="table" summary="メモリー保護（ prot ）" cellpadding="4px" style="border-collapse: collapse;border-top: 3px solid #527bbd; border-bottom: 3px solid #527bbd; border-left: 3px solid #527bbd; border-right: 3px solid #527bbd; "><colgroup><col class="col_1" /><col class="col_2" /></colgroup><thead><tr><th style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top">値</th><th style="border-bottom: 1px solid #527bbd; " align="left" valign="top">説明</th></tr></thead><tbody><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">PROT_NONE</pre></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">アクセス無し</pre></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">PROT_READ</pre></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">読み込みアクセス</pre></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">PROT_WRITE</pre></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">書き込みアクセス</pre></td></tr><tr><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">PROT_EXEC</pre></td><td style="" align="left" valign="top"><pre class="literallayout">実行可能</pre></td></tr></tbody></table></div></div><br class="table-break" /><p>　PROT_READ は読み込みが可能なページ。</p><p>　PROT_WRITE は書き込みが可能なページ。</p><p>　PROTO_EXEC は実行できるページてな感じです。</p><p>　flags 引数にはいろんな指定が可能ですが、基本的な用途には以下 2 つを抑えれば十分です。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+MAP_PRIVATE
+</span></dt><dd>
+メモリーマップに加えた変更は外部プロセスから見えない。Copy-On-Write (COW) という方式を使うため、プロセスまるごとにコピーはせず必要な時に元のプロセスから子プロセスに対してコピーが行われる。 ( flags で指定 )
+</dd><dt><span class="term">
+MAP_SHARED
+</span></dt><dd>
+メモリーマップを外部プロセスと共有できる ( flags で指定 )
+</dd></dl></div><p>　MAP_PRIVATE は単一プロセスでしか使わないページのマッピングに適しています。メモリー側での処理が行われるだけで、ファイルに変更が更新されません。</p><p>　MAP_SHARED は他のプロセスから見えるだけでなく、マップしたファイルにも変更が更新されます。</p><p>　ではいくつか引数を指定しながら説明していきたいと思います。</p><p><strong>main.c. </strong>
+</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+  2 #include &lt;unistd.h&gt;
+  3 #include &lt;sys/mman.h&gt;
+  4 #include &lt;sys/types.h&gt;
+  5 #include &lt;sys/stat.h&gt;
+  6 #include &lt;fcntl.h&gt;
+  7 #include &lt;stdlib.h&gt;
+  8
+  9 #define COUNT 65536
+ 10
+ 11 int main()
+ 12 {
+ 13   int fd;
+ 14   char buf[COUNT];
+ 15   char *mm;
+ 16   off_t len;
+ 17   long sum;
+ 18
+ 19   int i;
+ 20   len = sysconf(_SC_PAGESIZE);
+ 21   for(i = 0; i &lt; len; i++)
+ 22     buf[i] = 1;
+ 23   for(i = len; i &lt; len*2; i++)
+ 24     buf[i] = 2;
+ 25   buf[len*2] = '\0';
+ 26
+ 27   fd = open("abc.txt",O_CREAT|O_RDWR|O_TRUNC,0644);
+ 28   if(fd &lt; 0){
+ 29     perror("open");
+ 30     exit(1);
+ 31   }
+ 32   write(fd,buf,COUNT);
+ 33
+ 34   mm = mmap(NULL,len,PROT_READ,MAP_PRIVATE,fd,len);
+ 35   sum = 0;
+ 36   for(i = 0; i &lt; len; i++)
+ 37     sum += mm[i];
+ 38   printf("sum = %ld\n",sum);
+ 39
+ 40   munmap(mm,len);
+ 41
+ 42   mm = mmap(NULL,len,PROT_READ,MAP_PRIVATE,fd,0);
+ 43   sum = 0;
+ 44   for(i = 0; i &lt; len; i++)
+ 45     sum += mm[i];
+ 46   printf("sum = %ld\n",sum);
+ 47
+ 48   munmap(mm,len);
+ 49   close(fd);
+ 50
+ 51   return 0;
+ 52 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+sum = 8192
+sum = 4096</pre><p>
+</p><p>　このソースコードは少し複雑なので、軽くまとめてからコードの説明に入りたいと思います。</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">
+buf は COUNT バイトの配列です。0 から len までを 1 とし len から len*2 までを 2 に設定します。
+</li><li class="listitem">
+abc.txt を生成または開き fd にファイル記述子を保存します。
+</li><li class="listitem">
+mmap をコールして len オフセットを起点として len バイトのマッピングをします。マッピングしたアドレスは mm に保存します
+</li><li class="listitem">
+mm のマッピングを解除します。
+</li><li class="listitem">
+mmap をコールしてオフセット 0 を起点として len バイトのマッピングをします。マッピングしたアドレスは mm に保存します。
+</li><li class="listitem">
+mm のマッピングを解除します。
+</li><li class="listitem">
+fd を close をコールして閉じます。
+</li></ol></div><p>　buf が元データの配列で mm がマップ先のアドレスとなります。</p><pre class="programlisting"> 13   int fd;
+ 14   char buf[COUNT];
+ 15   char *mm;
+ 16   off_t len;
+ 17   long sum;</pre><p>　fd はファイル記述子を保持し len はページサイズとして使います。</p><p>　sum 変数は（加算結果による）データマッピングのチェックに使います。</p><pre class="programlisting">  9 #define COUNT 65536
+//途中割愛
+ 19   int i;
+ 20   len = sysconf(_SC_PAGESIZE);
+ 21   for(i = 0; i &lt; len; i++)
+ 22     buf[i] = 1;
+ 23   for(i = len; i &lt; len*2; i++)
+ 24     buf[i] = 2;
+ 25   buf[len*2] = '\0';</pre><p>　len は sysconf を使ってシステムのページサイズをランタイム取得した値を保持します。</p><p>　次に buf にデータを設定します。</p><p>　buf の配列のうち添字が [0,len) の範囲は全て 1 に設定します。</p><p>　[len,len*2) の範囲は全て 2 に設定します。</p><p>　buf の値は正確なデータ箇所をマッピングしたかのチェックに使います。</p><p>　ファイルマッピングには「 abc.txt 」を使います。</p><pre class="programlisting"> 27   fd = open("abc.txt",O_CREAT|O_RDWR|O_TRUNC,0644);
+ 28   if(fd &lt; 0){
+ 29     perror("open");
+ 30     exit(1);
+ 31   }
+ 32   write(fd,buf,COUNT);</pre><p>　O_CREAT が指定されているので、既に同名のファイルが存在していれば内容をクリーンにして読み込みます。</p><p>　write 関数は buf を abc.txt に書き込みます。</p><p>　buf のデータサイズである COUNT は 65536 になっていますが、そのまま全てを書き込みます。</p><pre class="programlisting">  9 #define COUNT 65536</pre><p>　そしてやっとですが mmap をコールします。</p><pre class="programlisting"> 34   mm = mmap(NULL,len,PROT_READ,MAP_PRIVATE,fd,len);</pre><p>　まず addr 引数は NULL とします。</p><p>　NULL はどのアドレスにマッピングを作るかはカーネルに任せるということです。</p><p>　まあどのアドレスにマッピングしたいか特別な設計でも無い限りこれで大丈夫です。</p><p>　まず length は len に設定していますが、これはページサイズのことです。</p><p>　筆者のシステムでは 4096 になっています。</p><p>　offset 引数についても len に設定しています。</p><p>　これは [len,len+len) の範囲をマッピングしたアドレスを mm に返す効果があります。</p><p>　prot 引数には PROT_READ を設定してます。</p><p>　これは mm からデータを読み込みよという意味です。</p><p>　最後に flags 引数には MAP_PRIVATE を指定していますね。</p><p>　これはローカルプロセス内でのみ使うという意味です。</p><p>　後はデータチェックの部分です。</p><pre class="programlisting"> 35   sum = 0;
+ 36   for(i = 0; i &lt; len; i++)
+ 37     sum += mm[i];
+ 38   printf("sum = %ld\n",sum);
+ 39</pre><p>　このループは mm にマップされたデータを一つ残らず sum に加算していき、以下を標準出力します。</p><pre class="programlisting">sum = 8192</pre><p>　buf に入っていたデータがファイルに書き込まれているので、マップによって mm には指定された領域のデータが詰まっています。</p><p>　てなことでこの場合はページサイズこと len が 4096 となり、マップした領域は全て 2 に設定されているので sum は 8192 になります。</p><p>　後は mm は不要になるのでマップを解除します。</p><pre class="programlisting"> 40   munmap(mm,len);</pre><p>　マップの解除によって mm は再利用可能となります。</p><p>　次は引数 length と offset を変えて実験します。</p><pre class="programlisting"> 42   mm = mmap(NULL,len,PROT_READ,MAP_PRIVATE,fd,0);
+ 43   sum = 0;
+ 44   for(i = 0; i &lt; len; i++)
+ 45     sum += mm[i];
+ 46   printf("sum = %ld\n",sum);
+ 47
+ 48   munmap(mm,len);
+ 49   close(fd);</pre><p>　この場合の mmap は [0,len) の範囲を mm にマップします。</p><p>　該当範囲は 1 に設定されているので全て加算するとページサイズ len と同じ 4096 が出力されます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pt06.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt06.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch74.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

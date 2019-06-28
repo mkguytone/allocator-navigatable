@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>53.1. alloca() の使用法</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch53.html" title="第53章 alloca() 関数" /><link rel="prev" href="ch53.html" title="第53章 alloca() 関数" /><link rel="next" href="ch54.html" title="第54章 posix_memalign() / aligned_alloc()" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch53.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch54.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_alloca_の使用法"></a>53.1. alloca() の使用法</h2></div></div></div><p>　スタック領域で動的な割り当てをするなら簡単な構造体・オブジェクトを使うと良いでしょう。</p><p>　もちろん構造体の割り当ては alloca() を使わなくてもできます。</p><p>　例えばポインターが配列を指していない以下のような場合ですね。</p><p><strong>main.c. </strong>
+</p><pre class="programlisting">  1 #include &lt;alloca.h&gt;
+  2 #include &lt;stdio.h&gt;
+  3
+  4 typedef struct _foo {
+  5   int x,y,z;
+  6 } foo;
+  7
+  8 int main()
+  9 {
+ 10   void* ptr = NULL;
+ 11   foo f;
+ 12   ptr = (void*)&amp;f;
+ 13   printf("%p\n",ptr);
+ 14   return 0;
+ 15 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+0x7ffdc9be8ddc</pre><p>
+</p><p>　この例だと alloca() をわざわざ使うのは手間に感じられます。</p><p>　まあそれでも alloca() の方が見た目は良いですけどね…</p><p>　(´・ω・｀)</p><p>　ポインターが配列を指す以下のソースコードでは alloca() によって割り当てを済ませると、コードが意図していることが良くわかります。</p><p><strong>main.c. </strong>
+</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+  2 #include &lt;alloca.h&gt;
+  3
+  4 typedef struct _foo {
+  5   int x,y,z;
+  6 } foo;
+  7
+  8 int main()
+  9 {
+ 10   foo* foo_ptr = NULL;
+ 11   foo* tmp;
+ 12   int i;
+ 13
+ 14   foo_ptr = alloca(sizeof(foo)*4);
+ 15   tmp = foo_ptr;
+ 16   for(i = 0; i &lt; 4; i++){
+ 17     foo_ptr-&gt;x = i+1;
+ 18     foo_ptr-&gt;y = i+2;
+ 19     foo_ptr-&gt;z = i+3;
+ 20     foo_ptr++;
+ 21   }
+ 22
+ 23   printf("foo_ptr[0].z =&gt; %d\n",tmp-&gt;z);
+ 24   printf("foo_ptr[3].x =&gt; %d\n",(tmp+3)-&gt;x);
+ 25   printf("foo_ptr[1].y =&gt; %d\n",(tmp+1)-&gt;y);
+ 26
+ 27   return 0;
+ 28 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+foo_ptr[0].z =&gt; 3
+foo_ptr[3].x =&gt; 4
+foo_ptr[1].y =&gt; 3</pre><p>
+</p><p>　この場合の配列は 4 個分の要素を持てますが、これは alloca() によって動的に決定できます。</p><p>　あとは一応コードの捕捉をしておきますか…　(´・ω・｀)</p><p>　foo_ptr は 4 個分の foo 構造体を動的に割り当てたポインターです。</p><p>　そして tmp は最初のアドレスを記憶しておくポインター変数となります。</p><p>　for ループの箇所では 4 回の反復をし、そのたびにポインターをインクリメントして、次の foo を指すアドレスに foo_ptr のポインターを更新しています。</p><p>　printf() 文については foo_ptr を最初の位置に巻き戻すのが面倒くさいので tmp から各 foo オブジェクトにアクセスしています。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch53.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch53.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch54.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

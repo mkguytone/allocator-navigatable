@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第62章 ページ記述子（ struct page ）</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt05.html" title="パート V. Linux カーネルのメモリーとファイルシステム" /><link rel="prev" href="ch61.html" title="第61章 仮想メモリー領域（ vm_area_struct ）" /><link rel="next" href="ch63.html" title="第63章 ページとブロック" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch61.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch63.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_ページ記述子_struct_page"></a>第62章 ページ記述子（ struct page ）</h2></div></div></div><p>　ページ記述子は物理ページと関連したオブジェクトです。</p><p>　カーネル側としてはページ記述子が物理ページ・物理アドレスの情報を持っていてくれることで、システムにあるページの情報を把握することができます。</p><p>　例えばページが未使用（未割り当て）なのか、使用中（割り当て済み）ならば誰が所有者なのかという情報も含まれます。</p><p>　所有者については必ずしもユーザープロセスに限定されず、以下のようなケースもありえますね。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+動的に割り当てられたカーネルデータ
+</li><li class="listitem">
+静的なカーネルコード
+</li><li class="listitem">
+ページキャッシュ
+</li></ul></div><p>　ではコードも見てみましょう。</p><p>　ページ記述子は構造体としては複雑な方に部類されるかと…</p><p>　まあ、とりあえず宣言・定義を見ちゃってくださいな。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/mm_types.h
+ 70 struct page {
+ 71   unsigned long flags;    /* Atomic flags, some possibly
+ 72            * updated asynchronously */
+ 73   /*
+ 74    * Five words (20/40 bytes) are available in this union.
+ 75    * WARNING: bit 0 of the first word is used for PageTail(). That
+ 76    * means the other users of this union MUST NOT use the bit to
+ 77    * avoid collision and false-positive PageTail().
+ 78    */
+ 79   union {
+ 80     struct {  /* Page cache and anonymous pages */
+ 81       /**
+ 82        * @lru: Pageout list, eg. active_list protected by
+ 83        * zone_lru_lock.  Sometimes used as a generic list
+ 84        * by the page owner.
+ 85        */
+ 86       struct list_head lru;
+ 87       /* See page-flags.h for PAGE_MAPPING_FLAGS */
+ 88       struct address_space *mapping;
+ 89       pgoff_t index;    /* Our offset within mapping. */
+ 90       /**
+ 91        * @private: Mapping-private opaque data.
+ 92        * Usually used for buffer_heads if PagePrivate.
+ 93        * Used for swp_entry_t if PageSwapCache.
+ 94        * Indicates order in the buddy system if PageBuddy.
+ 95        */
+ 96       unsigned long private;
+ 97     };
+ 98     struct {  /* slab, slob and slub */
+ 99       union {
+100         struct list_head slab_list; /* uses lru */
+101         struct {  /* Partial pages */
+102           struct page *next;
+103 #ifdef CONFIG_64BIT
+104           int pages;  /* Nr of pages left */
+105           int pobjects; /* Approximate count */
+106 #else
+107           short int pages;
+108           short int pobjects;
+109 #endif
+110         };
+111       };
+112       struct kmem_cache *slab_cache; /* not slob */
+113       /* Double-word boundary */
+114       void *freelist;   /* first free object */
+115       union {
+116         void *s_mem;  /* slab: first object */
+117         unsigned long counters;   /* SLUB */
+118         struct {      /* SLUB */
+119           unsigned inuse:16;
+120           unsigned objects:15;
+121           unsigned frozen:1;
+122         };
+123       };
+124     };
+125     struct {  /* Tail pages of compound page */
+126       unsigned long compound_head;  /* Bit zero is set */
+127
+128       /* First tail page only */
+129       unsigned char compound_dtor;
+130       unsigned char compound_order;
+131       atomic_t compound_mapcount;
+132     };
+133     struct {  /* Second tail page of compound page */
+134       unsigned long _compound_pad_1;  /* compound_head */
+135       unsigned long _compound_pad_2;
+136       struct list_head deferred_list;
+137     };
+138     struct {  /* Page table pages */
+139       unsigned long _pt_pad_1;  /* compound_head */
+140       pgtable_t pmd_huge_pte; /* protected by page-&gt;ptl */
+141       unsigned long _pt_pad_2;  /* mapping */
+142       union {
+143         struct mm_struct *pt_mm; /* x86 pgds only */
+144         atomic_t pt_frag_refcount; /* powerpc */
+145       };
+146 #if ALLOC_SPLIT_PTLOCKS
+147       spinlock_t *ptl;
+148 #else
+149       spinlock_t ptl;
+150 #endif
+151     };
+152     struct {  /* ZONE_DEVICE pages */
+153       /** @pgmap: Points to the hosting device page map. */
+154       struct dev_pagemap *pgmap;
+155       unsigned long hmm_data;
+156       unsigned long _zd_pad_1;  /* uses mapping */
+157     };
+158
+159     /** @rcu_head: You can use this to free a page by RCU. */
+160     struct rcu_head rcu_head;
+161   };
+162
+163   union {   /* This union is 4 bytes in size. */
+164     /*
+165      * If the page can be mapped to userspace, encodes the number
+166      * of times this page is referenced by a page table.
+167      */
+168     atomic_t _mapcount;
+169
+170     /*
+171      * If the page is neither PageSlab nor mappable to userspace,
+172      * the value stored here may help determine what this page
+173      * is used for.  See page-flags.h for a list of page types
+174      * which are currently stored here.
+175      */
+176     unsigned int page_type;
+177
+178     unsigned int active;    /* SLAB */
+179     int units;      /* SLOB */
+180   };
+181
+182   /* Usage count. *DO NOT USE DIRECTLY*. See page_ref.h */
+183   atomic_t _refcount;
+184
+185 #ifdef CONFIG_MEMCG
+186   struct mem_cgroup *mem_cgroup;
+187 #endif
+188
+189   /*
+190    * On machines where all RAM is mapped into kernel address space,
+191    * we can simply calculate the virtual address. On machines with
+192    * highmem some memory is mapped into kernel virtual memory
+193    * dynamically, so we need a place to store that address.
+194    * Note that this field could be 16 bits on x86 ... ;)
+195    *
+196    * Architectures with slow multiplication can define
+197    * WANT_PAGE_VIRTUAL in asm/page.h
+198    */
+199 #if defined(WANT_PAGE_VIRTUAL)
+200   void *virtual;      /* Kernel virtual address (NULL if
+201              not kmapped, ie. highmem) */
+202 #endif /* WANT_PAGE_VIRTUAL */
+203
+204 #ifdef LAST_CPUPID_NOT_IN_PAGE_FLAGS
+205   int _last_cpupid;
+206 #endif
+207 } _struct_page_alignment;</pre><p>　この中で特に重要なメンバー変数は flags です。</p><p>　flags はページが dirty かロック状態か等の情報を保持します。</p><p>　まあ dirty が何かどかロックどかは重要じゃないんで覚える必要は無いです。</p><p>　それと _refcount はページへの参照の数をキープしてくれます。</p><p>　virtual はページの仮想アドレスを保持します。</p><p>　まあ、こんなもんですかね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch61.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt05.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch63.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>46.1. チャンクを取り扱えるマクロ</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch46.html" title="第46章 malloc.c の内部マクロ" /><link rel="prev" href="ch46.html" title="第46章 malloc.c の内部マクロ" /><link rel="next" href="ch47.html" title="第47章 ファーストビンの解放" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch46.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch47.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_チャンクを取り扱えるマクロ"></a>46.1. チャンクを取り扱えるマクロ</h2></div></div></div><p>　チャンクをビンから削除するための unlink() みたいなマクロだけでなく、チャンクのリスト走査をしたり、属性情報を取得するためのマクロもあります。</p><p>　以下の malloc.c のソース箇所は、チャンクに関するマクロを網羅しています。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">1245 /* size field is or'ed with PREV_INUSE when previous adjacent chunk in use */
+1246 #define PREV_INUSE 0x1
+1247
+1248 /* extract inuse bit of previous chunk */
+1249 #define prev_inuse(p)       ((p)-&gt;mchunk_size &amp; PREV_INUSE)
+1250
+1251
+1252 /* size field is or'ed with IS_MMAPPED if the chunk was obtained with mmap() */
+1253 #define IS_MMAPPED 0x2
+1254
+1255 /* check for mmap()'ed chunk */
+1256 #define chunk_is_mmapped(p) ((p)-&gt;mchunk_size &amp; IS_MMAPPED)
+1257
+1258
+1259 /* size field is or'ed with NON_MAIN_ARENA if the chunk was obtained
+1260    from a non-main arena.  This is only set immediately before handing
+1261    the chunk to the user, if necessary.  */
+1262 #define NON_MAIN_ARENA 0x4
+1263
+1264 /* Check for chunk from main arena.  */
+1265 #define chunk_main_arena(p) (((p)-&gt;mchunk_size &amp; NON_MAIN_ARENA) == 0)
+1266
+1267 /* Mark a chunk as not being on the main arena.  */
+1268 #define set_non_main_arena(p) ((p)-&gt;mchunk_size |= NON_MAIN_ARENA)
+1269
+1270
+1271 /*
+1272    Bits to mask off when extracting size
+1273
+1274    Note: IS_MMAPPED is intentionally not masked off from size field in
+1275    macros for which mmapped chunks should never be seen. This should
+1276    cause helpful core dumps to occur if it is tried by accident by
+1277    people extending or adapting this malloc.
+1278  */
+1279 #define SIZE_BITS (PREV_INUSE | IS_MMAPPED | NON_MAIN_ARENA)
+1280
+1281 /* Get size, ignoring use bits */
+1282 #define chunksize(p) (chunksize_nomask (p) &amp; ~(SIZE_BITS))
+1283
+1284 /* Like chunksize, but do not mask SIZE_BITS.  */
+1285 #define chunksize_nomask(p)         ((p)-&gt;mchunk_size)
+1286
+1287 /* Ptr to next physical malloc_chunk. */
+1288 #define next_chunk(p) ((mchunkptr) (((char *) (p)) + chunksize (p)))
+1289
+1290 /* Size of the chunk below P.  Only valid if prev_inuse (P).  */
+1291 #define prev_size(p) ((p)-&gt;mchunk_prev_size)
+1292
+1293 /* Set the size of the chunk below P.  Only valid if prev_inuse (P).  */
+1294 #define set_prev_size(p, sz) ((p)-&gt;mchunk_prev_size = (sz))
+1295
+1296 /* Ptr to previous physical malloc_chunk.  Only valid if prev_inuse (P).  */
+1297 #define prev_chunk(p) ((mchunkptr) (((char *) (p)) - prev_size (p)))
+1298
+1299 /* Treat space at ptr + offset as a chunk */
+1300 #define chunk_at_offset(p, s)  ((mchunkptr) (((char *) (p)) + (s)))
+1301
+1302 /* extract p's inuse bit */
+1303 #define inuse(p)                    \
+1304   ((((mchunkptr) (((char *) (p)) + chunksize (p)))-&gt;mchunk_size) &amp; PREV_INUSE)
+1305
+1306 /* set/clear chunk as being inuse without otherwise disturbing */
+1307 #define set_inuse(p)                    \
+1308   ((mchunkptr) (((char *) (p)) + chunksize (p)))-&gt;mchunk_size |= PREV_INUSE
+1309
+1310 #define clear_inuse(p)                    \
+1311   ((mchunkptr) (((char *) (p)) + chunksize (p)))-&gt;mchunk_size &amp;= ~(PREV_INUSE)
+1312
+1313
+1314 /* check/set/clear inuse bits in known places */
+1315 #define inuse_bit_at_offset(p, s)               \
+1316   (((mchunkptr) (((char *) (p)) + (s)))-&gt;mchunk_size &amp; PREV_INUSE)
+1317
+1318 #define set_inuse_bit_at_offset(p, s)               \
+1319   (((mchunkptr) (((char *) (p)) + (s)))-&gt;mchunk_size |= PREV_INUSE)
+1320
+1321 #define clear_inuse_bit_at_offset(p, s)               \
+1322   (((mchunkptr) (((char *) (p)) + (s)))-&gt;mchunk_size &amp;= ~(PREV_INUSE))
+1323
+1324
+1325 /* Set size at head, without disturbing its use bit */
+1326 #define set_head_size(p, s)  ((p)-&gt;mchunk_size = (((p)-&gt;mchunk_size &amp; SIZE_BITS) | (s)))
+1327
+1328 /* Set size/use field */
+1329 #define set_head(p, s)       ((p)-&gt;mchunk_size = (s))
+1330
+1331 /* Set size at footer (only when chunk is not in use) */
+1332 #define set_foot(p, s)       (((mchunkptr) ((char *) (p) + (s)))-&gt;mchunk_prev_size = (s))</pre><p>
+</p><p>　この中で重要なのは set_head() と set_foot() マクロです。</p><p>　チャンクのヘッダーとフッターを設定しています。</p><p>　チャンクのヘッダーとは use ビットやサイズ「 mchunk_size 」のことでして、このヘッダーから次のチャンクのアドレスを割り出すことができます。</p><pre class="programlisting">1328 /* Set size/use field */
+1329 #define set_head(p, s)       ((p)-&gt;mchunk_size = (s))</pre><p>　フッターはフリーチャンクで前のチャンクのサイズのことです。</p><pre class="programlisting">1331 /* Set size at footer (only when chunk is not in use) */
+1332 #define set_foot(p, s)       (((mchunkptr) ((char *) (p) + (s)))-&gt;mchunk_prev_size = (s))</pre><p>　フッター「 mchunk_prev_size 」を設定することでチャンクが使われていない事が判別できます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch46.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch46.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch47.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

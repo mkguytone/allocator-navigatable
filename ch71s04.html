@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>71.4. inode (カーネル)</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch71.html" title="第71章 Linux のファイルシステム" /><link rel="prev" href="ch71s03.html" title="71.3. super_block (カーネル)" /><link rel="next" href="ch71s05.html" title="71.5. dentry (カーネル)" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch71s03.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch71s05.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_inode_カーネル"></a>71.4. inode (カーネル)</h2></div></div></div><p>　inode は「index node」の略です。</p><p>　ファイル、ディレクトリー、FIFOといったファイルシステムオブジェクトを実装したオブジェクトです。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/fs.h
+ 572 struct inode {
+ 573   umode_t     i_mode;
+ 574   unsigned short    i_opflags;
+ 575   kuid_t      i_uid;
+ 576   kgid_t      i_gid;
+ 577   unsigned int    i_flags;
+ 578
+ 579 #ifdef CONFIG_FS_POSIX_ACL
+ 580   struct posix_acl  *i_acl;
+ 581   struct posix_acl  *i_default_acl;
+ 582 #endif
+ 583
+ 584   const struct inode_operations *i_op;
+ 585   struct super_block  *i_sb;
+ 586   struct address_space  *i_mapping;
+//....一部割愛
+ 637   struct list_head  i_lru;    /* inode LRU list */
+ 638   struct list_head  i_sb_list;
+ 639   struct list_head  i_wb_list;  /* backing dev writeback list */
+ 640   union {
+ 641     struct hlist_head i_dentry;
+ 642     struct rcu_head   i_rcu;
+ 643   };
+ 644   atomic64_t    i_version;
+ 645   atomic_t    i_count;
+ 646   atomic_t    i_dio_count;
+ 647   atomic_t    i_writecount;
+ 648 #ifdef CONFIG_IMA
+ 649   atomic_t    i_readcount; /* struct files open RO */
+ 650 #endif
+ 651   const struct file_operations  *i_fop; /* former -&gt;i_op-&gt;default_file_ops
+ 652   struct file_lock_context  *i_flctx;
+ 653   struct address_space  i_data;
+ 654   struct list_head  i_devices;
+ 655   union {
+ 656     struct pipe_inode_info  *i_pipe;
+ 657     struct block_device *i_bdev;
+ 658     struct cdev   *i_cdev;
+ 659     char      *i_link;
+ 660     unsigned    i_dir_seq;
+ 661   };</pre><p>　以下のようにファイルやディレクトリーに関するメタデータを保持します。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+ユーザー ID
+</li><li class="listitem">
+グループ ID
+</li><li class="listitem">
+ファイルサイズ
+</li></ul></div><p>　このオブジェクトはファイル・ディレクトリーがアクセスされたときに生成されるはずです。</p><p>　inode は inode_operations をメンバーオブジェクトとして宣言してます。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/fs.h
+1754 struct inode_operations {
+1755   struct dentry * (*lookup) (struct inode *,struct dentry *, unsigned int);
+1756   const char * (*get_link) (struct dentry *, struct inode *, struct delayed_call *);
+1757   int (*permission) (struct inode *, int);
+1758   struct posix_acl * (*get_acl)(struct inode *, int);
+1759
+1760   int (*readlink) (struct dentry *, char __user *,int);
+1761
+1762   int (*create) (struct inode *,struct dentry *, umode_t, bool);
+1763   int (*link) (struct dentry *,struct inode *,struct dentry *);
+1764   int (*unlink) (struct inode *,struct dentry *);
+1765   int (*symlink) (struct inode *,struct dentry *,const char *);
+1766   int (*mkdir) (struct inode *,struct dentry *,umode_t);
+1767   int (*rmdir) (struct inode *,struct dentry *);
+1768   int (*mknod) (struct inode *,struct dentry *,umode_t,dev_t);
+1769   int (*rename) (struct inode *, struct dentry *,
+1770       struct inode *, struct dentry *, unsigned int);
+1771   int (*setattr) (struct dentry *, struct iattr *);
+1772   int (*getattr) (const struct path *, struct kstat *, u32, unsigned int);
+1773   ssize_t (*listxattr) (struct dentry *, char *, size_t);
+1774   int (*fiemap)(struct inode *, struct fiemap_extent_info *, u64 start,
+1775           u64 len);
+1776   int (*update_time)(struct inode *, struct timespec64 *, int);
+1777   int (*atomic_open)(struct inode *, struct dentry *,
+1778          struct file *, unsigned open_flag,
+1779          umode_t create_mode, int *opened);
+1780   int (*tmpfile) (struct inode *, struct dentry *, umode_t);
+1781   int (*set_acl)(struct inode *, struct posix_acl *, int);
+1782 } ____cacheline_aligned;</pre><p>　このオブジェクトが関数ポインターを保持しているので、この関数ポインターを使って操作をします。</p><p>　create / link / unlink / lookup といった基本操作を可能とする関数ポインターが宣言されてますね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch71s03.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch71.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch71s05.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

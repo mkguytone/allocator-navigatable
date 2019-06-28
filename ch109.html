@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第109章 std::pmr::polymorphic_allocator の動作チェック</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt14.html" title="パート XIV. （おまけ）アロケーターのポリモーフィズム" /><link rel="prev" href="ch108.html" title="第108章 std::experimental::pmr::vector コンテナ ( C++17 )" /><link rel="next" href="ch109s01.html" title="109.1. ポリモーフィックアロケーターの実装" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch108.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch109s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_std_pmr_polymorphic_allocator_の動作チェック"></a>第109章 std::pmr::polymorphic_allocator の動作チェック</h2></div></div></div><p>　では std::pmr::polymorphic_allocator と std::experimental::pmr::vector の最低限の情報は得られたので、使って確認して見ましょう。</p><p>　std::pmr::polymorphic_allocator で説明したいのはポリモーフィズムなので、それに特化したソースコードとするには、そのまんまのポリモーフィズムの例を書くのが早いです。</p><p>　つまりですね std::pmr::polymorphic_allocator を切り替えられれば十分です。</p><p>　まずはソースコードです。</p><p><strong>main.cpp. </strong>
+</p><pre class="programlisting">  1 #include &lt;experimental/memory_resource&gt;
+  2 #include &lt;experimental/vector&gt;
+  3 #include &lt;iostream&gt;
+  4 #include &lt;vector&gt;
+  5 #include &lt;cstdlib&gt;
+  6 #include &lt;cstdio&gt;
+  7 #include &lt;cassert&gt;
+  8
+  9 #define MAX_OBJECTS 32
+ 10
+ 11 template&lt;typename T, std::size_t N&gt;
+ 12 class aligned_allocator : public std::experimental::pmr::memory_resource
+ 13 {
+ 14   typedef std::size_t size_type;
+ 15   typedef T value_type;
+ 16   typedef value_type* pointer;
+ 17   typedef const value_type* const_pointer;
+ 18   typedef value_type&amp; reference;
+ 19   typedef const value_type&amp; const_reference;
+ 20
+ 21 public:
+ 22   explicit aligned_allocator() noexcept = default;
+ 23   explicit inline aligned_allocator(const aligned_allocator&amp;)  {}
+ 24
+ 25   template&lt;typename U&gt;
+ 26   inline aligned_allocator(const aligned_allocator&lt;U,N&gt;&amp;) {}
+ 27
+ 28 protected:
+ 29   void *do_allocate(std::size_t n, std::size_t) override
+ 30   {
+ 31     std::printf("do_allocate() @ aligned_allocator\n");
+ 32     return static_cast&lt;pointer&gt;(std::aligned_alloc(16,n * sizeof(T)));
+ 33   }
+ 34
+ 35   void do_deallocate(void *p, size_t, std::size_t) override
+ 36   {
+ 37     std::printf("do_deallocate() %p  @ aligned_allocator\n",p);
+ 38     std::free(p);
+ 39     p = nullptr;
+ 40   }
+ 41
+ 42   bool do_is_equal(std::experimental::pmr::memory_resource const &amp; other) const noexcept override
+ 43   {
+ 44     std::printf("do_is_equal() @ aligned_allocator\n");
+ 45     return this == &amp;other;
+ 46   }
+ 47 };
+ 48
+ 49 template&lt;typename T, std::size_t N&gt;
+ 50 class heap_allocator : public std::experimental::pmr::memory_resource
+ 51 {
+ 52   typedef std::size_t size_type;
+ 53   typedef T value_type;
+ 54   typedef value_type* pointer;
+ 55   typedef const value_type* const_pointer;
+ 56   typedef value_type&amp; reference;
+ 57   typedef const value_type&amp; const_reference;
+ 58
+ 59 public:
+ 60   explicit heap_allocator() noexcept = default;
+ 61   explicit inline heap_allocator(const heap_allocator&amp;) {}
+ 62
+ 63   template&lt;typename U&gt;
+ 64   inline heap_allocator(const heap_allocator&lt;U,N&gt;&amp;) {}
+ 65
+ 66 protected:
+ 67   void *do_allocate(std::size_t n, std::size_t) override
+ 68   {
+ 69     std::printf("do_allocate() @ heap_allocator\n");
+ 70     return static_cast&lt;pointer&gt;(std::malloc(n * sizeof(T)));
+ 71   }
+ 72
+ 73   void do_deallocate(void *p, size_t, std::size_t) override
+ 74   {
+ 75     std::printf("do_deallocate() %p @ heap_allocator\n",p);
+ 76     std::free(p);
+ 77     p = nullptr;
+ 78   }
+ 79
+ 80   bool do_is_equal(std::experimental::pmr::memory_resource const&amp; other) const noexcept override
+ 81   {
+ 82     std::printf("do_is_equal() @ heap_allocator\n");
+ 83     return this == &amp;other;
+ 84   }
+ 85 };
+ 86
+ 87 int main()
+ 88 {
+ 89   aligned_allocator&lt;int,1024&gt; ma;
+ 90   heap_allocator&lt;char,1024&gt; ha;
+ 91   std::experimental::pmr::polymorphic_allocator&lt;int&gt; pa(&amp;ma);
+ 92   std::experimental::pmr::polymorphic_allocator&lt;int&gt; pa2(pa);
+ 93   std::experimental::pmr::polymorphic_allocator&lt;int&gt; pa3(&amp;ha);
+ 94
+ 95   std::experimental::pmr::vector&lt;int&gt; v1(pa);
+ 96   v1.push_back(1);
+ 97   v1.push_back(2);
+ 98   v1.push_back(3);
+ 99   std::experimental::pmr::vector&lt;int&gt; v2(pa2);
+100   v2 = v1;
+101
+102   std::cout &lt;&lt; "v2 size: " &lt;&lt; v2.size() &lt;&lt; '\n';
+103
+104   for(auto const&amp; x : v2){
+105     std::cout &lt;&lt; x &lt;&lt; " ";
+106   }
+107   std::cout &lt;&lt; '\n';
+108
+109   assert(v1.get_allocator() == v2.get_allocator());
+110
+111   std::experimental::pmr::vector&lt;int&gt; v3(pa3);
+112   v3 = v2;
+113
+114   v3.push_back(100);
+115   v3.push_back(1000);
+116   v3.pop_back();
+117
+118   std::cout &lt;&lt; "v3 size: " &lt;&lt; v3.size() &lt;&lt; '\n';
+119
+120   for(auto const&amp; x : v3){
+121     std::cout &lt;&lt; x &lt;&lt; " ";
+122   }
+123   std::cout &lt;&lt; '\n';
+124
+125   v1 = v3;
+126   v1.push_back(10000);
+127
+128   return 0;
+129 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ g++ main.cpp -std=c++17
+$ ./a.out
+do_allocate() @ aligned_allocator
+do_allocate() @ aligned_allocator
+do_deallocate() 0x55814a6ac280  @ aligned_allocator
+do_allocate() @ aligned_allocator
+do_deallocate() 0x55814a6ac2a0  @ aligned_allocator
+do_allocate() @ aligned_allocator
+v2 size: 3
+1 2 3
+do_allocate() @ heap_allocator
+do_allocate() @ heap_allocator
+do_deallocate() 0x55814a6ac280 @ heap_allocator
+v3 size: 4
+1 2 3 100
+do_allocate() @ aligned_allocator
+do_deallocate() 0x55814a6ac2d0  @ aligned_allocator
+do_deallocate() 0x55814a6ac360 @ heap_allocator
+do_deallocate() 0x55814a6ac320  @ aligned_allocator
+do_deallocate() 0x55814a6ac380  @ aligned_allocator</pre><p>
+</p><p>　最初に言ったとおり、このソースコードでは memory_resource のインターフェース（抽象クラス）を実装した 2 つのクラスを使い分けるポリモーフィズムを検証します。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+class aligned_allocator
+</li><li class="listitem">
+class heap_allocator
+</li></ul></div><p>　alinged_allocator はアラインメントを指定できるヒープアロケーターです。</p><p>　heap_allocator はアラインメントはデフォルトを使うので、アラインメントをデフォルト以外に変えることはできません。</p><p>　aligned_allocator は以下のようになってますね。</p><pre class="programlisting"> 11 template&lt;typename T, std::size_t N&gt;
+ 12 class aligned_allocator : public std::experimental::pmr::memory_resource
+ 13 {
+ 14   typedef std::size_t size_type;
+ 15   typedef T value_type;
+ 16   typedef value_type* pointer;
+ 17   typedef const value_type* const_pointer;
+ 18   typedef value_type&amp; reference;
+ 19   typedef const value_type&amp; const_reference;
+ 20
+ 21 public:
+ 22   explicit aligned_allocator() noexcept = default;
+ 23   explicit inline aligned_allocator(const aligned_allocator&amp;)  {}
+ 24
+ 25   template&lt;typename U&gt;
+ 26   inline aligned_allocator(const aligned_allocator&lt;U,N&gt;&amp;) {}
+ 27
+ 28 protected:
+ 29   void *do_allocate(std::size_t n, std::size_t) override
+ 30   {
+ 31     std::printf("do_allocate() @ aligned_allocator\n");
+ 32     return static_cast&lt;pointer&gt;(std::aligned_alloc(16,n * sizeof(T)));
+ 33   }
+ 34
+ 35   void do_deallocate(void *p, size_t, std::size_t) override
+ 36   {
+ 37     std::printf("do_deallocate() %p  @ aligned_allocator\n",p);
+ 38     std::free(p);
+ 39     p = nullptr;
+ 40   }
+ 41
+ 42   bool do_is_equal(std::experimental::pmr::memory_resource const &amp; other) const noexcept override
+ 43   {
+ 44     std::printf("do_is_equal() @ aligned_allocator\n");
+ 45     return this == &amp;other;
+ 46   }
+ 47 };</pre><p>　std::experimental::pmr::memory_resource の実装をやってるだけのクラスです。</p><p>　それとヒープアロケーターも、まあ中身はほぼ同じです。</p><pre class="programlisting"> 49 template&lt;typename T, std::size_t N&gt;
+ 50 class heap_allocator : public std::experimental::pmr::memory_resource
+ 51 {
+ 52   typedef std::size_t size_type;
+ 53   typedef T value_type;
+ 54   typedef value_type* pointer;
+ 55   typedef const value_type* const_pointer;
+ 56   typedef value_type&amp; reference;
+ 57   typedef const value_type&amp; const_reference;
+ 58
+ 59 public:
+ 60   explicit heap_allocator() noexcept = default;
+ 61   explicit inline heap_allocator(const heap_allocator&amp;) {}
+ 62
+ 63   template&lt;typename U&gt;
+ 64   inline heap_allocator(const heap_allocator&lt;U,N&gt;&amp;) {}
+ 65
+ 66 protected:
+ 67   void *do_allocate(std::size_t n, std::size_t) override
+ 68   {
+ 69     std::printf("do_allocate() @ heap_allocator\n");
+ 70     return static_cast&lt;pointer&gt;(std::malloc(n * sizeof(T)));
+ 71   }
+ 72
+ 73   void do_deallocate(void *p, size_t, std::size_t) override
+ 74   {
+ 75     std::printf("do_deallocate() %p @ heap_allocator\n",p);
+ 76     std::free(p);
+ 77     p = nullptr;
+ 78   }
+ 79
+ 80   bool do_is_equal(std::experimental::pmr::memory_resource const&amp; other) const noexcept override
+ 81   {
+ 82     std::printf("do_is_equal() @ heap_allocator\n");
+ 83     return this == &amp;other;
+ 84   }
+ 85 };</pre><p>　中身は malloc() をやってるだけですね。</p><p>　それでアロケーターの検証については少し考えてみました。</p><pre class="programlisting"> 89   aligned_allocator&lt;int,1024&gt; ma;
+ 90   heap_allocator&lt;char,1024&gt; ha;</pre><p>　 2 つのクラステンプレートのインスタンスを ma と ha とします。＠</p><p>　次に polymorphic_allocator のコンストラクターの引数に memory_resource を継承した ma と ha を渡します。</p><pre class="programlisting"> 91   std::experimental::pmr::polymorphic_allocator&lt;int&gt; pa(&amp;ma);
+ 92   std::experimental::pmr::polymorphic_allocator&lt;int&gt; pa2(pa);
+ 93   std::experimental::pmr::polymorphic_allocator&lt;int&gt; pa3(&amp;ha);</pre><p>　あとは polymorphic_allocator のインスタンスもコンストラクターの引数に使えますが、ここら辺は polymorphic_allocator の宣言を思いだしてくださいね。</p><pre class="programlisting">template&lt; class U &gt;
+polymorphic_allocator( const polymorphic_allocator&lt;U&gt;&amp; other ) noexcept;
+polymorphic_allocator( memory_resource* r);</pre><p>　これによって pa と pa2 は同じ memory_resource を指すポインターを保持する polymorphic_allocator のインスタンスとなります。</p><p>　pa3 は heap_allocator をベースにするので、アロケーターが他の 2 つと異なります。</p><p>　ではテストと行きましょう。</p><pre class="programlisting"> 95   std::experimental::pmr::vector&lt;int&gt; v1(pa);
+ 96   v1.push_back(1);
+ 97   v1.push_back(2);
+ 98   v1.push_back(3);
+ 99   std::experimental::pmr::vector&lt;int&gt; v2(pa2);
+100   v2 = v1;
+101
+102   std::cout &lt;&lt; "v2 size: " &lt;&lt; v2.size() &lt;&lt; '\n';
+103
+104   for(auto const&amp; x : v2){
+105     std::cout &lt;&lt; x &lt;&lt; " ";
+106   }
+107   std::cout &lt;&lt; '\n';
+108
+109   assert(v1.get_allocator() == v2.get_allocator());</pre><p>　std::experimental::pmr::vector は std::vector と同様でアロケーターを引数に指定することができます。</p><p>　これによりアロケーターが pa や pa2 の vector インスタンスが生成できます。</p><p>　それでポリモーフィズムのチェックは以下の行です。</p><pre class="programlisting">100   v2 = v1;</pre><p>　これはコピーができるかの確認をしています。</p><pre class="programlisting">do_allocate() @ aligned_allocator
+do_allocate() @ aligned_allocator
+do_deallocate() 0x55814a6ac280  @ aligned_allocator
+do_allocate() @ aligned_allocator
+do_deallocate() 0x55814a6ac2a0  @ aligned_allocator
+do_allocate() @ aligned_allocator
+v2 size: 3
+1 2 3</pre><p>　これを見ると v2 のサイズは 3 になってますね。</p><p>　つまり v1 の中身がそのまま v2 にコピーされてます。</p><p>　ただこの代入ではアロケーターは同じなので、ある意味当然と言えば当然の挙動かと思います。</p><pre class="programlisting">109   assert(v1.get_allocator() == v2.get_allocator());</pre><p>　ちなみに std::move による代入は例外を投げる可能性があり、 swap 関数については未定義動作になってしまうので代入はコピーに限ります。</p><p>　swap() 関数については実際試してみましたが、何か変な感じになってので、本当にアカンやつなんだなと思いました。</p><p>　てなことでコピー代入以外は使わない方が良いと思います。</p><p>　次は異なるアロケーターへのコピーができるか試して見ています。</p><pre class="programlisting">111   std::experimental::pmr::vector&lt;int&gt; v3(pa3);
+112   v3 = v2;
+113
+114   v3.push_back(100);
+115   v3.push_back(1000);
+116   v3.pop_back();
+117
+118   std::cout &lt;&lt; "v3 size: " &lt;&lt; v3.size() &lt;&lt; '\n';
+119
+120   for(auto const&amp; x : v3){
+121     std::cout &lt;&lt; x &lt;&lt; " ";
+122   }
+123   std::cout &lt;&lt; '\n';
+124
+125   v1 = v3;
+126   v1.push_back(10000);</pre><p>　コピー代入をしている行は以下です。</p><pre class="programlisting">112   v3 = v2;</pre><p>　これは heap_allocator を指すポインターを持つコンテナに対して aligned_allocator を指すポインターを持つコンテナをコピー代入しています。</p><p>　では出力をチェックです。</p><pre class="programlisting">do_allocate() @ heap_allocator
+do_allocate() @ heap_allocator
+do_deallocate() 0x55814a6ac280 @ heap_allocator
+v3 size: 4
+1 2 3 100
+do_allocate() @ aligned_allocator
+do_deallocate() 0x55814a6ac2d0  @ aligned_allocator
+do_deallocate() 0x55814a6ac360 @ heap_allocator
+do_deallocate() 0x55814a6ac320  @ aligned_allocator
+do_deallocate() 0x55814a6ac380  @ aligned_allocator</pre><p>　100 と 1000 を追加後に 1 回ポップしているので、サイズは v2 の分を加えて 4 個になります。</p><p>　さらにコンテナ内の要素は 1,2,3,100 となっていますので aligned_allocator で割り当てたデータは残っています。</p><p>　後は最後に v3 を v1 にコピー代入します。</p><pre class="programlisting">125   v1 = v3;
+126   v1.push_back(10000);</pre><p>　この最後の push_back() 関数は heap_allocator でなく aligned_allocator を使います。</p><p>　こんな感じで複数のアロケーターを動的に変更できるって仕組みです。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch108.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt14.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch109s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

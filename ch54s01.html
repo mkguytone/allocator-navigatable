@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>54.1. glibc-2.7 の内部実装</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch54.html" title="第54章 posix_memalign() / aligned_alloc()" /><link rel="prev" href="ch54.html" title="第54章 posix_memalign() / aligned_alloc()" /><link rel="next" href="ch54s02.html" title="54.2. アラインメントの仕組み" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch54.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch54s02.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_glibc_2_7_の内部実装"></a>54.1. glibc-2.7 の内部実装</h2></div></div></div><p>　では glibc-2.7 の posix_memalign の内部実装を見てみましょう。</p><p><strong>__posix_memalign 関数（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">5354 /* We need a wrapper function for one of the additions of POSIX.  */
+5355 int
+5356 __posix_memalign (void **memptr, size_t alignment, size_t size)
+5357 {
+5358   void *mem;
+5359
+5360   /* Test whether the SIZE argument is valid.  It must be a power of
+5361      two multiple of sizeof (void *).  */
+5362   if (alignment % sizeof (void *) != 0
+5363       || !powerof2 (alignment / sizeof (void *))
+5364       || alignment == 0)
+5365     return EINVAL;
+5366
+5367
+5368   void *address = RETURN_ADDRESS (0);
+5369   mem = _mid_memalign (alignment, size, address);
+5370
+5371   if (mem != NULL)
+5372     {
+5373       *memptr = mem;
+5374       return 0;
+5375     }
+5376
+5377   return ENOMEM;
+5378 }
+5379 weak_alias (__posix_memalign, posix_memalign)</pre><p>
+</p><p>　__posix_memalign() がベースとなる関数ですが、この関数は _mid_memalign() 関数をコールしていますね。</p><pre class="programlisting">5369   mem = _mid_memalign (alignment, size, address);</pre><p>　同様に alined_alloc() の実装も同様に _mid_memalign() 関数をコールします。</p><p><strong>__libc_memalign 関数（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">3252 void *
+3253 __libc_memalign (size_t alignment, size_t bytes)
+3254 {
+3255   void *address = RETURN_ADDRESS (0);
+3256   return _mid_memalign (alignment, bytes, address);
+3257 }
+//中略
+3329 /* For ISO C11.  */
+3330 weak_alias (__libc_memalign, aligned_alloc)
+3331 libc_hidden_def (__libc_memalign)
+//中略
+5580 strong_alias (__libc_memalign, __memalign)
+5581 weak_alias (__libc_memalign, memalign)</pre><p>
+</p><p>　では _mid_memalign() 関数の実装です。</p><p><strong>_mid_memalign 関数（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">3259 static void *
+3260 _mid_memalign (size_t alignment, size_t bytes, void *address)
+3261 {
+3262   mstate ar_ptr;
+3263   void *p;
+3264
+3265   void *(*hook) (size_t, size_t, const void *) =
+3266     atomic_forced_read (__memalign_hook);
+3267   if (__builtin_expect (hook != NULL, 0))
+3268     return (*hook)(alignment, bytes, address);
+3269
+3270   /* If we need less alignment than we give anyway, just relay to malloc.  */
+3271   if (alignment &lt;= MALLOC_ALIGNMENT)
+3272     return __libc_malloc (bytes);
+3273
+3274   /* Otherwise, ensure that it is at least a minimum chunk size */
+3275   if (alignment &lt; MINSIZE)
+3276     alignment = MINSIZE;
+3277
+3278   /* If the alignment is greater than SIZE_MAX / 2 + 1 it cannot be a
+3279      power of 2 and will cause overflow in the check below.  */
+3280   if (alignment &gt; SIZE_MAX / 2 + 1)
+3281     {
+3282       __set_errno (EINVAL);
+3283       return 0;
+3284     }
+3285
+3286   /* Check for overflow.  */
+3287   if (bytes &gt; SIZE_MAX - alignment - MINSIZE)
+3288     {
+3289       __set_errno (ENOMEM);
+3290       return 0;
+3291     }
+3292
+3293
+3294   /* Make sure alignment is power of 2.  */
+3295   if (!powerof2 (alignment))
+3296     {
+3297       size_t a = MALLOC_ALIGNMENT * 2;
+3298       while (a &lt; alignment)
+3299         a &lt;&lt;= 1;
+3300       alignment = a;
+3301     }
+3302
+3303   if (SINGLE_THREAD_P)
+3304     {
+3305       p = _int_memalign (&amp;main_arena, alignment, bytes);
+3306       assert (!p || chunk_is_mmapped (mem2chunk (p)) ||
+3307         &amp;main_arena == arena_for_chunk (mem2chunk (p)));
+3308
+3309       return p;
+3310     }
+3311
+3312   arena_get (ar_ptr, bytes + alignment + MINSIZE);
+3313
+3314   p = _int_memalign (ar_ptr, alignment, bytes);
+3315   if (!p &amp;&amp; ar_ptr != NULL)
+3316     {
+3317       LIBC_PROBE (memory_memalign_retry, 2, bytes, alignment);
+3318       ar_ptr = arena_get_retry (ar_ptr, bytes);
+3319       p = _int_memalign (ar_ptr, alignment, bytes);
+3320     }
+3321
+3322   if (ar_ptr != NULL)
+3323     __libc_lock_unlock (ar_ptr-&gt;mutex);
+3324
+3325   assert (!p || chunk_is_mmapped (mem2chunk (p)) ||
+3326           ar_ptr == arena_for_chunk (mem2chunk (p)));
+3327   return p;
+3328 }</pre><p>
+</p><p>　この中で注目したいのは MALLOC_ALIGNMENT 以下のアラインメントサイズであれば __libc_malloc() で割り当てを行うということです。</p><pre class="programlisting">3270   /* If we need less alignment than we give anyway, just relay to malloc.  */
+3271   if (alignment &lt;= MALLOC_ALIGNMENT)
+3272     return __libc_malloc (bytes);</pre><p>　この _mid_memalign() 関数は __libc_malloc() 関数をコールしてます。</p><p>　さらに _mid_memalign() 関数は _int_memalign() 関数もコールしてます。</p><pre class="programlisting">3312   arena_get (ar_ptr, bytes + alignment + MINSIZE);
+3313
+3314   p = _int_memalign (ar_ptr, alignment, bytes);
+3315   if (!p &amp;&amp; ar_ptr != NULL)
+3316     {
+3317       LIBC_PROBE (memory_memalign_retry, 2, bytes, alignment);
+3318       ar_ptr = arena_get_retry (ar_ptr, bytes);
+3319       p = _int_memalign (ar_ptr, alignment, bytes);
+3320     }</pre><p>　リクエストされたアラインメントサイズが MALLOC_ALIGNMENT 以下の数値であれば __libc_malloc() 関数が呼び出され、そうでなければ代わりに _int_memalign() 関数がコールされるってな感じです。</p><p>　てなことで __libc_malloc() と _int_memalign() 関数の中身もチェックしてみましょう。</p><p><strong>__libc_malloc 関数（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">3026 void *
+3027 __libc_malloc (size_t bytes)
+3028 {
+3029   mstate ar_ptr;
+3030   void *victim;
+3031
+3032   void *(*hook) (size_t, const void *)
+3033     = atomic_forced_read (__malloc_hook);
+3034   if (__builtin_expect (hook != NULL, 0))
+3035     return (*hook)(bytes, RETURN_ADDRESS (0));
+3036 #if USE_TCACHE
+3037   /* int_free also calls request2size, be careful to not pad twice.  */
+3038   size_t tbytes;
+3039   checked_request2size (bytes, tbytes);
+3040   size_t tc_idx = csize2tidx (tbytes);
+3041
+3042   MAYBE_INIT_TCACHE ();
+3043
+3044   DIAG_PUSH_NEEDS_COMMENT;
+3045   if (tc_idx &lt; mp_.tcache_bins
+3046       /*&amp;&amp; tc_idx &lt; TCACHE_MAX_BINS*/ /* to appease gcc */
+3047       &amp;&amp; tcache
+3048       &amp;&amp; tcache-&gt;entries[tc_idx] != NULL)
+3049     {
+3050       return tcache_get (tc_idx);
+3051     }
+3052   DIAG_POP_NEEDS_COMMENT;
+3053 #endif
+3054
+3055   if (SINGLE_THREAD_P)
+3056     {
+3057       victim = _int_malloc (&amp;main_arena, bytes);
+3058       assert (!victim || chunk_is_mmapped (mem2chunk (victim)) ||
+3059         &amp;main_arena == arena_for_chunk (mem2chunk (victim)));
+3060       return victim;
+3061     }
+3062
+3063   arena_get (ar_ptr, bytes);
+3064
+3065   victim = _int_malloc (ar_ptr, bytes);
+3066   /* Retry with another arena only if we were able to find a usable arena
+3067      before.  */
+3068   if (!victim &amp;&amp; ar_ptr != NULL)
+3069     {
+3070       LIBC_PROBE (memory_malloc_retry, 1, bytes);
+3071       ar_ptr = arena_get_retry (ar_ptr, bytes);
+3072       victim = _int_malloc (ar_ptr, bytes);
+3073     }
+3074
+3075   if (ar_ptr != NULL)
+3076     __libc_lock_unlock (ar_ptr-&gt;mutex);
+3077
+3078   assert (!victim || chunk_is_mmapped (mem2chunk (victim)) ||
+3079           ar_ptr == arena_for_chunk (mem2chunk (victim)));
+3080   return victim;
+3081 }</pre><p>
+</p><p>　__libc_malloc() 関数は _int_malloc() 関数をコールしてますね。</p><pre class="programlisting">3063   arena_get (ar_ptr, bytes);
+3064
+3065   victim = _int_malloc (ar_ptr, bytes);
+3066   /* Retry with another arena only if we were able to find a usable arena
+3067      before.  */
+3068   if (!victim &amp;&amp; ar_ptr != NULL)
+3069     {
+3070       LIBC_PROBE (memory_malloc_retry, 1, bytes);
+3071       ar_ptr = arena_get_retry (ar_ptr, bytes);
+3072       victim = _int_malloc (ar_ptr, bytes);
+3073     }</pre><p>　_int_malloc() 関数の宣言は以下のようになっています。</p><pre class="programlisting">static void*  _int_malloc(mstate, size_t);</pre><p>　この __libc_malloc() と _int_malloc() 関数は malloc の内部実装に該当します。</p><p>　つまりリクエストされたアラインメントサイズが MALLOC_ALIGNMENT 以下の数値であればデフォルトのアラインメントが適用されます。</p><p>　筆者の開発環境では 16 バイト境界がデフォルトになります。</p><p>　そして _int_memalign() も同様に _int_malloc() 関数をコールします。</p><p><strong>_int_memalign 関数（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">4661 static void *
+4662 _int_memalign (mstate av, size_t alignment, size_t bytes)
+4663 {
+4664   INTERNAL_SIZE_T nb;             /* padded  request size */
+4665   char *m;                        /* memory returned by malloc call */
+4666   mchunkptr p;                    /* corresponding chunk */
+4667   char *brk;                      /* alignment point within p */
+4668   mchunkptr newp;                 /* chunk to return */
+4669   INTERNAL_SIZE_T newsize;        /* its size */
+4670   INTERNAL_SIZE_T leadsize;       /* leading space before alignment point */
+4671   mchunkptr remainder;            /* spare room at end to split off */
+4672   unsigned long remainder_size;   /* its size */
+4673   INTERNAL_SIZE_T size;
+4674
+4675
+4676
+4677   checked_request2size (bytes, nb);
+4678
+4679   /*
+4680      Strategy: find a spot within that chunk that meets the alignment
+4681      request, and then possibly free the leading and trailing space.
+4682    */
+4683
+4684
+4685   /* Check for overflow.  */
+4686   if (nb &gt; SIZE_MAX - alignment - MINSIZE)
+4687     {
+4688       __set_errno (ENOMEM);
+4689       return 0;
+4690     }
+4691
+4692   /* Call malloc with worst case padding to hit alignment. */
+4693
+4694   m = (char *) (_int_malloc (av, nb + alignment + MINSIZE));
+4695
+4696   if (m == 0)
+4697     return 0;           /* propagate failure */
+4698
+4699   p = mem2chunk (m);
+4700
+4701   if ((((unsigned long) (m)) % alignment) != 0)   /* misaligned */
+4702
+4703     { /*
+4704                 Find an aligned spot inside chunk.  Since we need to give back
+4705                 leading space in a chunk of at least MINSIZE, if the first
+4706                 calculation places us at a spot with less than MINSIZE leader,
+4707                 we can move to the next aligned spot -- we've allocated enough
+4708                 total room so that this is always possible.
+4709                  */
+4710       brk = (char *) mem2chunk (((unsigned long) (m + alignment - 1)) &amp;
+4711                                 - ((signed long) alignment));
+4712       if ((unsigned long) (brk - (char *) (p)) &lt; MINSIZE)
+4713         brk += alignment;
+4714
+4715       newp = (mchunkptr) brk;
+4716       leadsize = brk - (char *) (p);
+4717       newsize = chunksize (p) - leadsize;
+4718
+4719       /* For mmapped chunks, just adjust offset */
+4720       if (chunk_is_mmapped (p))
+4721         {
+4722           set_prev_size (newp, prev_size (p) + leadsize);
+4723           set_head (newp, newsize | IS_MMAPPED);
+4724           return chunk2mem (newp);
+4725         }
+4726
+4727       /* Otherwise, give back leader, use the rest */
+4728       set_head (newp, newsize | PREV_INUSE |
+4729                 (av != &amp;main_arena ? NON_MAIN_ARENA : 0));
+4730       set_inuse_bit_at_offset (newp, newsize);
+4731       set_head_size (p, leadsize | (av != &amp;main_arena ? NON_MAIN_ARENA : 0));
+4732       _int_free (av, p, 1);
+4733       p = newp;
+4734
+4735       assert (newsize &gt;= nb &amp;&amp;
+4736               (((unsigned long) (chunk2mem (p))) % alignment) == 0);
+4737     }
+4738
+4739   /* Also give back spare room at the end */
+4740   if (!chunk_is_mmapped (p))
+4741     {
+4742       size = chunksize (p);
+4743       if ((unsigned long) (size) &gt; (unsigned long) (nb + MINSIZE))
+4744         {
+4745           remainder_size = size - nb;
+4746           remainder = chunk_at_offset (p, nb);
+4747           set_head (remainder, remainder_size | PREV_INUSE |
+4748                     (av != &amp;main_arena ? NON_MAIN_ARENA : 0));
+4749           set_head_size (p, nb);
+4750           _int_free (av, remainder, 1);
+4751         }
+4752     }
+4753
+4754   check_inuse_chunk (av, p);
+4755   return chunk2mem (p);
+4756 }</pre><p>
+</p><p>　この中で注目したいのはメモリーの割り当て時に、パディングされたバイトサイズとなる nb に対してアラインメントと MINSIZE が追加されることです。</p><pre class="programlisting">4692   /* Call malloc with worst case padding to hit alignment. */
+4693
+4694   m = (char *) (_int_malloc (av, nb + alignment + MINSIZE));</pre><p>　アラインメントは MINSIZE を加算することで可能になるのが分かると思います。</p><p>　MINSIZE については以下のように計算されます。</p><p><strong><a class="ulink" href="https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c" target="_top">https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c</a>. </strong>
+</p><pre class="programlisting">1190 /* The smallest possible chunk */
+1191 #define MIN_CHUNK_SIZE        (offsetof(struct malloc_chunk, fd_nextsize))
+1192
+1193 /* The smallest size we can malloc is an aligned minimal chunk */
+1194
+1195 #define MINSIZE  \
+1196   (unsigned long)(((MIN_CHUNK_SIZE+MALLOC_ALIGN_MASK) &amp; ~MALLOC_ALIGN_MASK))</pre><p>
+</p><p>　MIN_CHUNK_SIZE は struct malloc_chunk 構造体のメンバー fd_nextsize までのオフセットバイトを取得したものです。</p><p>　参考までに以下が malloc_chunk の定義となります。</p><p><strong><a class="ulink" href="https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c" target="_top">https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c</a>. </strong>
+</p><pre class="programlisting">1060 struct malloc_chunk {
+1061
+1062   INTERNAL_SIZE_T      mchunk_prev_size;  /* Size of previous chunk (if free).  */
+1063   INTERNAL_SIZE_T      mchunk_size;       /* Size in bytes, including overhead. */
+1064
+1065   struct malloc_chunk* fd;         /* double links -- used only if free. */
+1066   struct malloc_chunk* bk;
+1067
+1068   /* Only used for large blocks: pointer to next larger size.  */
+1069   struct malloc_chunk* fd_nextsize; /* double links -- used only if free. */
+1070   struct malloc_chunk* bk_nextsize;
+1071 };</pre><p>
+</p><p>　MINSIZE マクロは分かりにくいので、簡単なアラインメントをするコードを次の項目で考えて見ましょう。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch54.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch54.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch54s02.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

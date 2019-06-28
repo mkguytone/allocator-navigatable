@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第22章 fopen / fread / fwrite / fclose 関数</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt02.html" title="パート II. Linux (POSIX) のファイル入出力" /><link rel="prev" href="ch21.html" title="第21章 lseek()" /><link rel="next" href="pt03.html" title="パート III. Linux でメモリー割り当て" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch21.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt03.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_fopen_fread_fwrite_fclose_関数"></a>第22章 fopen / fread / fwrite / fclose 関数</h2></div></div></div><p>　ファイル記述子でなくFILEストリームを使いたい場合は fopen / fread / fwrite / fclose 関数を使うことができます。</p><p>　とりえあえず関数の宣言から見てきましょう。</p><pre class="programlisting">#include &lt;stdio.h&gt;
+
+FILE *fopen(const char *pathname, const char *mode);
+
+int fclose(FILE *stream);
+
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+
+size_t fwrite(const void *ptr, size_t size, size_t nmemb,FILE *stream);</pre><p>　fopen の mode は以下の 6 種類あります。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+r
+</span></dt><dd>
+読み込みの為に開きます。
+</dd><dt><span class="term">
+r+
+</span></dt><dd>
+書き込みと読み込みの両用で開きます。
+</dd><dt><span class="term">
+w
+</span></dt><dd>
+書き込みのために開きます。
+</dd><dt><span class="term">
+w+
+</span></dt><dd>
+書き込みと読み込みの両用で開きます。
+</dd><dt><span class="term">
+a
+</span></dt><dd>
+アペンドの為に開きます。
+</dd><dt><span class="term">
+a+
+</span></dt><dd>
+アペンドと読み込みの為に開きます。
+</dd></dl></div><p>　FILEストリームは fprintf で使った stdout や stderr に相当するものです。</p><p>　ストリームは FILE オブジェクトを指しているポインターなので、ファイル記述子とは別物です。</p><p>　まあさして重要じゃないんで、実装例を軽く見るだけで良いでしょう。</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+  2 #include &lt;stdlib.h&gt;
+  3 #include &lt;fcntl.h&gt;
+  4 #define BUFFER_SIZE 8192
+  5
+  6 int main(int argc, char **argv)
+  7 {
+  8   int size;
+  9   FILE *stream;
+ 10   char buf[BUFFER_SIZE];
+ 11
+ 12   if (argc != 2) {
+ 13     fprintf(stderr, "ファイル名を指定してください\n");
+ 14     exit(1);
+ 15   }
+ 16
+ 17   stream = fopen(argv[1], "r");
+ 18
+ 19   if (stream == NULL) {
+ 20     fprintf(stderr, "%s を開けませんでした\n", argv[1]);
+ 21     exit(1);
+ 22   }
+ 23
+ 24   size = 1;
+ 25   while (size &gt; 0) {
+ 26     size = fread(buf, 1, BUFFER_SIZE, stream);
+ 27     if (size &gt; 0) {
+ 28       fwrite(buf, 1, size, stdout);
+ 29     }
+ 30   }
+ 31   fclose(stream);
+ 32   return 0;
+ 33 }</pre><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ echo "abcde" &gt; "abc.txt"
+$ echo "12345" &gt;&gt; "abc.txt"
+$ gcc main.c
+$ ./a.out abc.txt
+abcde
+12345</pre><p>
+</p><p>　まずは変数から説明しますかね。</p><pre class="programlisting">  8   int size;
+  9   FILE *stream;
+ 10   char buf[BUFFER_SIZE];</pre><p>　size は fread() 関数の返り値を保持する変数として使います。</p><p>　読みこんだバイトサイズですね。</p><p>　stream は FILE オブジェクトを指すポインターです。</p><p>　ここでは fopen() の返り値となりますが、読み込み専用の指定をしているので入力ストリームとでも読んでおきましょう。</p><pre class="programlisting"> 17   stream = fopen(argv[1], "r");</pre><p>　ファイルシステムから読み込んだデータをメモリーへ保持するために使う変数が buf です。</p><pre class="programlisting"> 24   size = 1;
+ 25   while (size &gt; 0) {
+ 26     size = fread(buf, 1, BUFFER_SIZE, stream);
+ 27     if (size &gt; 0) {
+ 28       fwrite(buf, 1, size, stdout);
+ 29     }
+ 30   }</pre><p>　正直 BUFFER_SIZE が大きめなので while 文を使うまでもないんですけど、本当に大きいデータを読みこむならループにしておきます。</p><p>　まず fread() が stream から BUFFER_SIZE バイトを読み込うとします。</p><p>　それで size が 0 以上ならば fwrite() で標準出力をします。</p><p>　この際に出力に使うサイズは fread の返り値を保持する size 変数を使っています。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch21.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt02.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="pt03.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

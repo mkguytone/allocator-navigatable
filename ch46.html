@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第46章 malloc.c の内部マクロ</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch45.html" title="第45章 malloc() フリーチャンクの挙動" /><link rel="next" href="ch46s01.html" title="46.1. チャンクを取り扱えるマクロ" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch45.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch46s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_malloc_c_の内部マクロ"></a>第46章 malloc.c の内部マクロ</h2></div></div></div><p>　malloc.c ではビンにアクセスしたり、リストを連結解除（アンリンク、unlink）するマクロが用意されています。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">1389 typedef struct malloc_chunk *mbinptr;
+1390
+1391 /* addressing -- note that bin_at(0) does not exist */
+1392 #define bin_at(m, i) \
+1393   (mbinptr) (((char *) &amp;((m)-&gt;bins[((i) - 1) * 2]))           \
+1394              - offsetof (struct malloc_chunk, fd))
+1395
+1396 /* analog of ++bin */
+1397 #define next_bin(b)  ((mbinptr) ((char *) (b) + (sizeof (mchunkptr) &lt;&lt; 1)))
+1398
+1399 /* Reminders about list directionality within bins */
+1400 #define first(b)     ((b)-&gt;fd)
+1401 #define last(b)      ((b)-&gt;bk)
+1402
+1403 /* Take a chunk off a bin list */
+1404 #define unlink(AV, P, BK, FD) {                                            \
+1405     if (__builtin_expect (chunksize(P) != prev_size (next_chunk(P)), 0))      \
+1406       malloc_printerr ("corrupted size vs. prev_size");           \
+1407     FD = P-&gt;fd;                     \
+1408     BK = P-&gt;bk;                     \
+1409     if (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, 0))         \
+1410       malloc_printerr ("corrupted double-linked list");           \
+1411     else {                      \
+1412         FD-&gt;bk = BK;                    \
+1413         BK-&gt;fd = FD;                    \
+1414         if (!in_smallbin_range (chunksize_nomask (P))           \
+1415             &amp;&amp; __builtin_expect (P-&gt;fd_nextsize != NULL, 0)) {          \
+1416       if (__builtin_expect (P-&gt;fd_nextsize-&gt;bk_nextsize != P, 0)        \
+1417     || __builtin_expect (P-&gt;bk_nextsize-&gt;fd_nextsize != P, 0))    \
+1418         malloc_printerr ("corrupted double-linked list (not small)");   \
+1419             if (FD-&gt;fd_nextsize == NULL) {              \
+1420                 if (P-&gt;fd_nextsize == P)              \
+1421                   FD-&gt;fd_nextsize = FD-&gt;bk_nextsize = FD;         \
+1422                 else {                    \
+1423                     FD-&gt;fd_nextsize = P-&gt;fd_nextsize;           \
+1424                     FD-&gt;bk_nextsize = P-&gt;bk_nextsize;           \
+1425                     P-&gt;fd_nextsize-&gt;bk_nextsize = FD;           \
+1426                     P-&gt;bk_nextsize-&gt;fd_nextsize = FD;           \
+1427                   }                   \
+1428               } else {                    \
+1429                 P-&gt;fd_nextsize-&gt;bk_nextsize = P-&gt;bk_nextsize;         \
+1430                 P-&gt;bk_nextsize-&gt;fd_nextsize = P-&gt;fd_nextsize;         \
+1431               }                     \
+1432           }                     \
+1433       }                       \
+1434 }</pre><p>
+</p><p>　前にも説明しましたが bin_at() マクロは指定したインデックスのチャンクにアクセスできるようになっています。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">1392 #define bin_at(m, i) \
+1393   (mbinptr) (((char *) &amp;((m)-&gt;bins[((i) - 1) * 2]))           \
+1394              - offsetof (struct malloc_chunk, fd))</pre><p>
+</p><p>　このマクロは bins[] 配列が fd と bk の 2 つからなるために 2 の倍数に変換していますね。</p><p>　後は malloc_chunk 構造体のメンバー fd のオフセットを引いて調整しています。</p><p>　next_bin / first / last は malloc_chunk 構造体のメンバーにアクセスしているだけのマクロですね。</p><p>　それとアルゴリズムとして理解しておくと良いのが、双方向連結リストの要素削除です。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">1403 /* Take a chunk off a bin list */
+1404 #define unlink(AV, P, BK, FD) {                                            \
+1405     if (__builtin_expect (chunksize(P) != prev_size (next_chunk(P)), 0))      \
+1406       malloc_printerr ("corrupted size vs. prev_size");           \
+1407     FD = P-&gt;fd;                     \
+1408     BK = P-&gt;bk;                     \
+1409     if (__builtin_expect (FD-&gt;bk != P || BK-&gt;fd != P, 0))         \
+1410       malloc_printerr ("corrupted double-linked list");           \
+1411     else {                      \
+1412         FD-&gt;bk = BK;                    \
+1413         BK-&gt;fd = FD;                    \</pre><p>
+</p><p>　unlink() マクロは以下のような処理をします。</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">
+P のチャンクサイズが、前のチャンクと等しいかチェックして、違うならエラーを投げます。
+</li><li class="listitem">
+P のフォワードポインターとバックワードポインターを FD と BK に代入します。
+</li><li class="listitem">
+FD-&gt;bk != P または BK-&gt;fd != P のチェックをし、条件が偽ならエラーを投げます。
+</li><li class="listitem">
+FD のバックワードポインターに BK を代入、BK のフォワードポインターに FD を代入します。
+</li></ol></div><p>　これによりチャンク P を双方向連結リストから削除します。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch45.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch46s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

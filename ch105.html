@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第105章 std::experimental::pmr::memory_resource ( C++17 )</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt14.html" title="パート XIV. （おまけ）アロケーターのポリモーフィズム" /><link rel="prev" href="ch104.html" title="第104章 メモリーリソースクラス" /><link rel="next" href="ch105s01.html" title="105.1. memory_resource でアラインメントの実装（非実用的な実験です）" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch104.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch105s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_std_experimental_pmr_memory_resource_c_17"></a>第105章 std::experimental::pmr::memory_resource ( C++17 )</h2></div></div></div><p>　memory_resource は実験的な新機能なのでテスト目的以外に利用すべきかは判断が分かれると思います。</p><p>　まあアロケーターを既に使っている人なんかには、不要だって言う人が多そうです。</p><p>　memory_resource の仕組みや実装は、インターフェースを実装するだけで済むのでアロケーターを作ったことがあれば難しくはないです。</p><p>　では簡単な実装例をみて見ましょう。</p><p><strong>main.cpp. </strong>
+</p><pre class="programlisting">  1 #include &lt;experimental/memory_resource&gt;
+  2 #include &lt;experimental/vector&gt;
+  3 #include &lt;iostream&gt;
+  4 #include &lt;vector&gt;
+  5 #include &lt;cstdlib&gt;
+  6
+  7 template&lt;typename T&gt;
+  8 class aligned_heap_allocator : public std::experimental::pmr::memory_resource
+  9 {
+ 10   typedef std::size_t size_type;
+ 11   typedef T value_type;
+ 12   typedef value_type* pointer;
+ 13   typedef const value_type* const_pointer;
+ 14   typedef value_type&amp; reference;
+ 15   typedef const value_type const_reference;
+ 16
+ 17 public:
+ 18   explicit aligned_heap_allocator() noexcept = default;
+ 19   explicit aligned_heap_allocator(const aligned_heap_allocator&amp;)  {}
+ 20
+ 21   template&lt;typename U&gt;
+ 22   aligned_heap_allocator(const aligned_heap_allocator&lt;U&gt;&amp;){}
+ 23
+ 24 protected:
+ 25   void *do_allocate(std::size_t n, std::size_t alignment = alignof(std::max_align_t)) override
+ 26   {
+ 27     return static_cast&lt;void*&gt;(std::aligned_alloc(alignment,n * sizeof(T)));
+ 28   }
+ 29
+ 30   void do_deallocate(void *p, size_t /* n */, std::size_t /* alignment */) override
+ 31   {
+ 32     std::free(p);
+ 33   }
+ 34
+ 35   bool do_is_equal(std::experimental::pmr::memory_resource const &amp; other) const noexcept override
+ 36   {
+ 37     return this == &amp;other;
+ 38   }
+ 39 };
+ 40
+ 41 int main()
+ 42 {
+ 43   aligned_heap_allocator&lt;int&gt; alloc;
+ 44   std::experimental::pmr::vector&lt;int&gt; vec({1},&amp;alloc);
+ 45   vec.push_back(10);
+ 46   vec.push_back(20);
+ 47
+ 48   std::cout &lt;&lt; vec[0] &lt;&lt; " " &lt;&lt; vec[1] &lt;&lt; '\n';
+ 49
+ 50   vec.pop_back();
+ 51   vec.push_back(30);
+ 52
+ 53   for(auto const&amp; x : vec)
+ 54     std::cout &lt;&lt; x &lt;&lt; " ";
+ 55   std::cout &lt;&lt; '\n';
+ 56 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ g++ main.cpp -std=c++17
+$ ./a.out
+1 10
+1 10 30</pre><p>
+</p><p>　ちなみにちょっとコードが汚くなってまして、すんません。</p><p>　次作を書きながらなので、完璧を目指すと爆死しそうなんで許してもらえると助かります。</p><pre class="programlisting"> 24 protected:
+ 25   void *do_allocate(std::size_t n, std::size_t alignment = alignof(std::max_align_t)) override
+ 26   {
+ 27     return static_cast&lt;void*&gt;(std::aligned_alloc(alignment,n * sizeof(T)));
+ 28   }
+ 29
+ 30   void do_deallocate(void *p, size_t /* n */, std::size_t /* alignment */) override
+ 31   {
+ 32     std::free(p);
+ 33   }
+ 34
+ 35   bool do_is_equal(std::experimental::pmr::memory_resource const &amp; other) const noexcept override
+ 36   {
+ 37     return this == &amp;other;
+ 38   }</pre><p>　やってることは do_allocate() / do_deallocate() / do_is_equal() 関数をオーバーライドだけですよね。</p><p>　それと std::aligned_alloc も使ってますが、ここは malloc() でも new でもなんでも良いわけです。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch104.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt14.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch105s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

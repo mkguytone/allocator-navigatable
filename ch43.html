@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第43章 Binmap のマクロ</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch42.html" title="第42章 トップチャンク（ Top Chunk ）のマクロ" /><link rel="next" href="ch44.html" title="第44章 tcache" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch42.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch44.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_binmap_のマクロ"></a>第43章 Binmap のマクロ</h2></div></div></div><p>　Binmap はビンが空か記録しているビットベクターです。</p><p>　具体的に語るなら struct malloc_state のメンバー binmap のことです。</p><pre class="programlisting">1698   /* Bitmap of bins */
+1699   unsigned int binmap[BINMAPSIZE];</pre><p>　この binmap[] 配列を使うことで、大量のビンの検索を効率化します。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">1547 /*
+1548    Binmap
+1549
+1550     To help compensate for the large number of bins, a one-level index
+1551     structure is used for bin-by-bin searching.  `binmap' is a
+1552     bitvector recording whether bins are definitely empty so they can
+1553     be skipped over during during traversals.  The bits are NOT always
+1554     cleared as soon as bins are empty, but instead only
+1555     when they are noticed to be empty during traversal in malloc.
+1556  */
+1557
+1558 /* Conservatively use 32 bits per map word, even if on 64bit system */
+1559 #define BINMAPSHIFT      5
+1560 #define BITSPERMAP       (1U &lt;&lt; BINMAPSHIFT)
+1561 #define BINMAPSIZE       (NBINS / BITSPERMAP)
+1562
+1563 #define idx2block(i)     ((i) &gt;&gt; BINMAPSHIFT)
+1564 #define idx2bit(i)       ((1U &lt;&lt; ((i) &amp; ((1U &lt;&lt; BINMAPSHIFT) - 1))))
+1565
+1566 #define mark_bin(m, i)    ((m)-&gt;binmap[idx2block (i)] |= idx2bit (i))
+1567 #define unmark_bin(m, i)  ((m)-&gt;binmap[idx2block (i)] &amp;= ~(idx2bit (i)))
+1568 #define get_binmap(m, i)  ((m)-&gt;binmap[idx2block (i)] &amp; idx2bit (i))</pre><p>
+</p><p>　一応ですが 1U は 1 の符号無し表現ですんで 1 と考えてもらって結構です。</p><p>　BITSREMAP マクロは 2 の 5 乗なので 32 に評価されます。</p><p>　NBINS は 128 なので BINNAPSIZE は 4 になります。</p><p>　つまりビンのインデックスは全て合わせて 128 個あるので、 binmap[4] に対して 32 ビットあるなら、32 ビットのビットベクターを 4 個のブロックに分割するというアイデアですね。</p><p>　idx2block(i) は i を 32 ビット表現のブロックインデックスにエンコードします。</p><p>　idx2bit(i) は i を 2 進数のビットベクターにエンコードします。</p><p>　後の処理はビットベクターにフラグを立てたり、クリアにしたり、ビットベクターからインデックスを抽出しています。</p><p>　まあこんなこと言われてもわからんでしょうから、一応検証してみましょう。</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+  2 #include &lt;stdlib.h&gt;
+  3
+  4 #define NBINS            128
+  5 #define BINMAPSHIFT      5
+  6 #define BITSPERMAP       (1U &lt;&lt; BINMAPSHIFT)
+  7 #define BINMAPSIZE       (NBINS / BITSPERMAP)
+  8
+  9 #define idx2block(i)     ((i) &gt;&gt; BINMAPSHIFT)
+ 10 #define idx2bit(i)       ((1U &lt;&lt; ((i) &amp; ((1U &lt;&lt; BINMAPSHIFT) - 1))))
+ 11
+ 12 #define mark_bin(m, i)    ((m)-&gt;binmap[idx2block (i)] |= idx2bit (i))
+ 13 #define unmark_bin(m, i)  ((m)-&gt;binmap[idx2block (i)] &amp;= ~(idx2bit (i)))
+ 14 #define get_binmap(m, i)  ((m)-&gt;binmap[idx2block (i)] &amp; idx2bit (i))
+ 15
+ 16 typedef struct _arena {
+ 17   unsigned int binmap[4];
+ 18 } arena;
+ 19
+ 20 int main()
+ 21 {
+ 22   int i,block,map,bit;
+ 23   arena av;
+ 24
+ 25   //32 * 4 = 128
+ 26   //binmap[0] =&gt; 0,1,2,3,4...,31
+ 27   //binmap[1] =&gt; 32,33,34,...,64 small bin
+ 28   //binmap[2] =&gt; 65,...,96
+ 29   //binmap[3] =&gt; 97,...,128
+ 30
+ 31   printf("%d\n",BINMAPSIZE);
+ 32
+ 33   for(i = 0; i &lt; 128; ++i){
+ 34      unmark_bin(&amp;av,i);
+ 35   }
+ 36
+ 37   for(i = 0; i &lt; 128; ++i){
+ 38     block = idx2block(i);
+ 39     bit = idx2bit(i);
+ 40     map = (&amp;av)-&gt;binmap[block];
+ 41     printf("%d : block %d : bit %d : map %u\n",i,block,bit,map);
+ 42   }
+ 43 }</pre><p>　このソースコードは binmap[4] の配列を arena という便宜上作った構造体に定義しています。</p><p>　そして unmark_bin() マクロによって一旦、全てのビットを 0 初期化します。</p><p>　後は算出した block と bit と map を表示しているだけです。</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+4
+0 : block 0 : bit 1 : map 0
+1 : block 0 : bit 2 : map 0
+2 : block 0 : bit 4 : map 0
+3 : block 0 : bit 8 : map 0
+4 : block 0 : bit 16 : map 0
+5 : block 0 : bit 32 : map 0
+6 : block 0 : bit 64 : map 0
+7 : block 0 : bit 128 : map 0
+8 : block 0 : bit 256 : map 0
+9 : block 0 : bit 512 : map 0
+10 : block 0 : bit 1024 : map 0
+11 : block 0 : bit 2048 : map 0
+12 : block 0 : bit 4096 : map 0
+13 : block 0 : bit 8192 : map 0
+14 : block 0 : bit 16384 : map 0
+15 : block 0 : bit 32768 : map 0
+16 : block 0 : bit 65536 : map 0
+17 : block 0 : bit 131072 : map 0
+18 : block 0 : bit 262144 : map 0
+19 : block 0 : bit 524288 : map 0
+20 : block 0 : bit 1048576 : map 0
+21 : block 0 : bit 2097152 : map 0
+22 : block 0 : bit 4194304 : map 0
+23 : block 0 : bit 8388608 : map 0
+24 : block 0 : bit 16777216 : map 0
+25 : block 0 : bit 33554432 : map 0
+26 : block 0 : bit 67108864 : map 0
+27 : block 0 : bit 134217728 : map 0
+28 : block 0 : bit 268435456 : map 0
+29 : block 0 : bit 536870912 : map 0
+30 : block 0 : bit 1073741824 : map 0
+31 : block 0 : bit -2147483648 : map 0
+32 : block 1 : bit 1 : map 0
+33 : block 1 : bit 2 : map 0
+34 : block 1 : bit 4 : map 0
+35 : block 1 : bit 8 : map 0
+36 : block 1 : bit 16 : map 0
+37 : block 1 : bit 32 : map 0
+38 : block 1 : bit 64 : map 0
+39 : block 1 : bit 128 : map 0
+40 : block 1 : bit 256 : map 0
+41 : block 1 : bit 512 : map 0
+42 : block 1 : bit 1024 : map 0
+43 : block 1 : bit 2048 : map 0
+44 : block 1 : bit 4096 : map 0
+45 : block 1 : bit 8192 : map 0
+46 : block 1 : bit 16384 : map 0
+47 : block 1 : bit 32768 : map 0
+48 : block 1 : bit 65536 : map 0
+49 : block 1 : bit 131072 : map 0
+50 : block 1 : bit 262144 : map 0
+51 : block 1 : bit 524288 : map 0
+52 : block 1 : bit 1048576 : map 0
+53 : block 1 : bit 2097152 : map 0
+54 : block 1 : bit 4194304 : map 0
+55 : block 1 : bit 8388608 : map 0
+56 : block 1 : bit 16777216 : map 0
+57 : block 1 : bit 33554432 : map 0
+58 : block 1 : bit 67108864 : map 0
+59 : block 1 : bit 134217728 : map 0
+60 : block 1 : bit 268435456 : map 0
+61 : block 1 : bit 536870912 : map 0
+62 : block 1 : bit 1073741824 : map 0
+63 : block 1 : bit -2147483648 : map 0
+64 : block 2 : bit 1 : map 0
+65 : block 2 : bit 2 : map 0
+66 : block 2 : bit 4 : map 0
+67 : block 2 : bit 8 : map 0
+68 : block 2 : bit 16 : map 0
+69 : block 2 : bit 32 : map 0
+70 : block 2 : bit 64 : map 0
+71 : block 2 : bit 128 : map 0
+72 : block 2 : bit 256 : map 0
+73 : block 2 : bit 512 : map 0
+74 : block 2 : bit 1024 : map 0
+75 : block 2 : bit 2048 : map 0
+76 : block 2 : bit 4096 : map 0
+77 : block 2 : bit 8192 : map 0
+78 : block 2 : bit 16384 : map 0
+79 : block 2 : bit 32768 : map 0
+80 : block 2 : bit 65536 : map 0
+81 : block 2 : bit 131072 : map 0
+82 : block 2 : bit 262144 : map 0
+83 : block 2 : bit 524288 : map 0
+84 : block 2 : bit 1048576 : map 0
+85 : block 2 : bit 2097152 : map 0
+86 : block 2 : bit 4194304 : map 0
+87 : block 2 : bit 8388608 : map 0
+88 : block 2 : bit 16777216 : map 0
+89 : block 2 : bit 33554432 : map 0
+90 : block 2 : bit 67108864 : map 0
+91 : block 2 : bit 134217728 : map 0
+92 : block 2 : bit 268435456 : map 0
+93 : block 2 : bit 536870912 : map 0
+94 : block 2 : bit 1073741824 : map 0
+95 : block 2 : bit -2147483648 : map 0
+96 : block 3 : bit 1 : map 0
+97 : block 3 : bit 2 : map 0
+98 : block 3 : bit 4 : map 0
+99 : block 3 : bit 8 : map 0
+100 : block 3 : bit 16 : map 0
+101 : block 3 : bit 32 : map 0
+102 : block 3 : bit 64 : map 0
+103 : block 3 : bit 128 : map 0
+104 : block 3 : bit 256 : map 0
+105 : block 3 : bit 512 : map 0
+106 : block 3 : bit 1024 : map 0
+107 : block 3 : bit 2048 : map 0
+108 : block 3 : bit 4096 : map 0
+109 : block 3 : bit 8192 : map 0
+110 : block 3 : bit 16384 : map 0
+111 : block 3 : bit 32768 : map 0
+112 : block 3 : bit 65536 : map 0
+113 : block 3 : bit 131072 : map 0
+114 : block 3 : bit 262144 : map 0
+115 : block 3 : bit 524288 : map 0
+116 : block 3 : bit 1048576 : map 0
+117 : block 3 : bit 2097152 : map 0
+118 : block 3 : bit 4194304 : map 0
+119 : block 3 : bit 8388608 : map 0
+120 : block 3 : bit 16777216 : map 0
+121 : block 3 : bit 33554432 : map 0
+122 : block 3 : bit 67108864 : map 0
+123 : block 3 : bit 134217728 : map 0
+124 : block 3 : bit 268435456 : map 0
+125 : block 3 : bit 536870912 : map 0
+126 : block 3 : bit 1073741824 : map 0
+127 : block 3 : bit -2147483648 : map 0</pre><p>
+</p><p>　出力のうちで注目すべきは block です。</p><p>　block は [0,1,2,3] というようにビンインデックスを 4 個に分類できています。</p><p>　さらに bit は [1,2,4,8,16,32,64,128,256,512,…] というように 2 の冪乗の数列になっています。</p><p>　つまり各ビットがフラグとなる、 32 ビットのビットベクターとなっていますね。</p><p>　この例では全てのビットがリセットされた状態ですが、例えば一部のビットをセットしたらどうなるか検証して見ましょう。</p><p><strong>main.c. </strong>
+</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+  2
+  3 #define NBINS            128
+  4 #define BINMAPSHIFT      5
+  5 #define BITSPERMAP       (1U &lt;&lt; BINMAPSHIFT)
+  6 #define BINMAPSIZE       (NBINS / BITSPERMAP)
+  7
+  8 #define idx2block(i)     ((i) &gt;&gt; BINMAPSHIFT)
+  9 #define idx2bit(i)       ((1U &lt;&lt; ((i) &amp; ((1U &lt;&lt; BINMAPSHIFT) - 1))))
+ 10
+ 11 #define mark_bin(m, i)    ((m)-&gt;binmap[idx2block (i)] |= idx2bit (i))
+ 12 #define unmark_bin(m, i)  ((m)-&gt;binmap[idx2block (i)] &amp;= ~(idx2bit (i)))
+ 13 #define get_binmap(m, i)  ((m)-&gt;binmap[idx2block (i)] &amp; idx2bit (i))
+ 14
+ 15 typedef struct _arena {
+ 16   unsigned int binmap[4];
+ 17 } arena;
+ 18
+ 19 int main()
+ 20 {
+ 21   int i,block,map,bit;
+ 22   arena av;
+ 23
+ 24   //32 * 4 = 128
+ 25   //binmap[0] =&gt; 0,1,2,3,4...,31
+ 26   //binmap[1] =&gt; 32,33,34,...,64 small bin
+ 27   //binmap[2] =&gt; 65,...,96
+ 28   //binmap[3] =&gt; 97,...,128
+ 29
+ 30   printf("%d\n",BINMAPSIZE);
+ 31
+ 32   for(i = 0; i &lt; 128; ++i){
+ 33      unmark_bin(&amp;av,i);
+ 34   }
+ 35
+ 36   mark_bin(&amp;av,3);
+ 37   mark_bin(&amp;av,33);
+ 38   mark_bin(&amp;av,125);
+ 39
+ 40   for(i = 0; i &lt; 128; ++i){
+ 41     block = idx2block(i);
+ 42     bit = idx2bit(i);
+ 43     map = (&amp;av)-&gt;binmap[block];
+ 44     printf("%d : block %d : bit %d : map %u\n",i,block,bit,map);
+ 45   }
+ 46 }</pre><p>
+</p><p>　前のコードと異なるのは以下の 3 行です。</p><pre class="programlisting"> 36   mark_bin(&amp;av,3);
+ 37   mark_bin(&amp;av,33);
+ 38   mark_bin(&amp;av,125);</pre><p>　36 行はブロック 0 の bit 8 を設定しています。</p><p>　37 行はブロック 1 の bit 2 を設定しています。</p><p>　38 行はブロック 3 の bit 536870912 を設定しています。</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+4
+0 : block 0 : bit 1 : map 8
+1 : block 0 : bit 2 : map 8
+2 : block 0 : bit 4 : map 8
+3 : block 0 : bit 8 : map 8
+4 : block 0 : bit 16 : map 8
+5 : block 0 : bit 32 : map 8
+6 : block 0 : bit 64 : map 8
+7 : block 0 : bit 128 : map 8
+8 : block 0 : bit 256 : map 8
+9 : block 0 : bit 512 : map 8
+10 : block 0 : bit 1024 : map 8
+11 : block 0 : bit 2048 : map 8
+12 : block 0 : bit 4096 : map 8
+13 : block 0 : bit 8192 : map 8
+14 : block 0 : bit 16384 : map 8
+15 : block 0 : bit 32768 : map 8
+16 : block 0 : bit 65536 : map 8
+17 : block 0 : bit 131072 : map 8
+18 : block 0 : bit 262144 : map 8
+19 : block 0 : bit 524288 : map 8
+20 : block 0 : bit 1048576 : map 8
+21 : block 0 : bit 2097152 : map 8
+22 : block 0 : bit 4194304 : map 8
+23 : block 0 : bit 8388608 : map 8
+24 : block 0 : bit 16777216 : map 8
+25 : block 0 : bit 33554432 : map 8
+26 : block 0 : bit 67108864 : map 8
+27 : block 0 : bit 134217728 : map 8
+28 : block 0 : bit 268435456 : map 8
+29 : block 0 : bit 536870912 : map 8
+30 : block 0 : bit 1073741824 : map 8
+31 : block 0 : bit -2147483648 : map 8
+32 : block 1 : bit 1 : map 2
+33 : block 1 : bit 2 : map 2
+34 : block 1 : bit 4 : map 2
+35 : block 1 : bit 8 : map 2
+36 : block 1 : bit 16 : map 2
+37 : block 1 : bit 32 : map 2
+38 : block 1 : bit 64 : map 2
+39 : block 1 : bit 128 : map 2
+40 : block 1 : bit 256 : map 2
+41 : block 1 : bit 512 : map 2
+42 : block 1 : bit 1024 : map 2
+43 : block 1 : bit 2048 : map 2
+44 : block 1 : bit 4096 : map 2
+45 : block 1 : bit 8192 : map 2
+46 : block 1 : bit 16384 : map 2
+47 : block 1 : bit 32768 : map 2
+48 : block 1 : bit 65536 : map 2
+49 : block 1 : bit 131072 : map 2
+50 : block 1 : bit 262144 : map 2
+51 : block 1 : bit 524288 : map 2
+52 : block 1 : bit 1048576 : map 2
+53 : block 1 : bit 2097152 : map 2
+54 : block 1 : bit 4194304 : map 2
+55 : block 1 : bit 8388608 : map 2
+56 : block 1 : bit 16777216 : map 2
+57 : block 1 : bit 33554432 : map 2
+58 : block 1 : bit 67108864 : map 2
+59 : block 1 : bit 134217728 : map 2
+60 : block 1 : bit 268435456 : map 2
+61 : block 1 : bit 536870912 : map 2
+62 : block 1 : bit 1073741824 : map 2
+63 : block 1 : bit -2147483648 : map 2
+64 : block 2 : bit 1 : map 0
+65 : block 2 : bit 2 : map 0
+66 : block 2 : bit 4 : map 0
+67 : block 2 : bit 8 : map 0
+68 : block 2 : bit 16 : map 0
+69 : block 2 : bit 32 : map 0
+70 : block 2 : bit 64 : map 0
+71 : block 2 : bit 128 : map 0
+72 : block 2 : bit 256 : map 0
+73 : block 2 : bit 512 : map 0
+74 : block 2 : bit 1024 : map 0
+75 : block 2 : bit 2048 : map 0
+76 : block 2 : bit 4096 : map 0
+77 : block 2 : bit 8192 : map 0
+78 : block 2 : bit 16384 : map 0
+79 : block 2 : bit 32768 : map 0
+80 : block 2 : bit 65536 : map 0
+81 : block 2 : bit 131072 : map 0
+82 : block 2 : bit 262144 : map 0
+83 : block 2 : bit 524288 : map 0
+84 : block 2 : bit 1048576 : map 0
+85 : block 2 : bit 2097152 : map 0
+86 : block 2 : bit 4194304 : map 0
+87 : block 2 : bit 8388608 : map 0
+88 : block 2 : bit 16777216 : map 0
+89 : block 2 : bit 33554432 : map 0
+90 : block 2 : bit 67108864 : map 0
+91 : block 2 : bit 134217728 : map 0
+92 : block 2 : bit 268435456 : map 0
+93 : block 2 : bit 536870912 : map 0
+94 : block 2 : bit 1073741824 : map 0
+95 : block 2 : bit -2147483648 : map 0
+96 : block 3 : bit 1 : map 536870912
+97 : block 3 : bit 2 : map 536870912
+98 : block 3 : bit 4 : map 536870912
+99 : block 3 : bit 8 : map 536870912
+100 : block 3 : bit 16 : map 536870912
+101 : block 3 : bit 32 : map 536870912
+102 : block 3 : bit 64 : map 536870912
+103 : block 3 : bit 128 : map 536870912
+104 : block 3 : bit 256 : map 536870912
+105 : block 3 : bit 512 : map 536870912
+106 : block 3 : bit 1024 : map 536870912
+107 : block 3 : bit 2048 : map 536870912
+108 : block 3 : bit 4096 : map 536870912
+109 : block 3 : bit 8192 : map 536870912
+110 : block 3 : bit 16384 : map 536870912
+111 : block 3 : bit 32768 : map 536870912
+112 : block 3 : bit 65536 : map 536870912
+113 : block 3 : bit 131072 : map 536870912
+114 : block 3 : bit 262144 : map 536870912
+115 : block 3 : bit 524288 : map 536870912
+116 : block 3 : bit 1048576 : map 536870912
+117 : block 3 : bit 2097152 : map 536870912
+118 : block 3 : bit 4194304 : map 536870912
+119 : block 3 : bit 8388608 : map 536870912
+120 : block 3 : bit 16777216 : map 536870912
+121 : block 3 : bit 33554432 : map 536870912
+122 : block 3 : bit 67108864 : map 536870912
+123 : block 3 : bit 134217728 : map 536870912
+124 : block 3 : bit 268435456 : map 536870912
+125 : block 3 : bit 536870912 : map 536870912
+126 : block 3 : bit 1073741824 : map 536870912
+127 : block 3 : bit -2147483648 : map 536870912</pre><p>
+</p><p>　まずビットをセットしたことによって map の値が変化していますよね？</p><p>　もうひとつ特筆すべきはブロック 2 の map が 0 のままということです。</p><p>　この場合、ブロック内のビンが使われているかは map が 0 でないことで瞬時に判定できます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch42.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch44.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

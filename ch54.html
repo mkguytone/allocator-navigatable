@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第54章 posix_memalign() / aligned_alloc()</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch53s01.html" title="53.1. alloca() の使用法" /><link rel="next" href="ch54s01.html" title="54.1. glibc-2.7 の内部実装" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch53s01.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch54s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_posix_memalign_aligned_alloc"></a>第54章 posix_memalign() / aligned_alloc()</h2></div></div></div><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+posix_memalign や aligned_alloc でアラインメントを取れる
+</li></ul></div><p>　ヒープ・動的メモリーの割り当てにはアラインメントの問題があります。</p><p>　筆者の経験だとスタック領域のほうがアラインメントが問題となりがちです。</p><p>　これはヒープはデフォルトで 16 バイト境界にアラインされてしまうからです。</p><p>　余程特殊なハードウェアやキャッシュ最適化でも考えない限りはヒープでは見落とされがちですね。はい…</p><p>　(´・ω・｀)</p><p>　まあ C プログラマーなら posix_memalign() / aligned_alloc() を抑えておけば十分かと思います。</p><p>　posix_memalign() は C 言語の関数ではありますが C++ で使われることもあります。</p><p>　理由としては C++11 に導入された alignas はスタックなら問題なかったんですがヒープでは必ずしもうまく動かないという現象があったらしいからです。</p><p>　具体的にはコンパイラによっては alignas キーワードが new に適用されないという問題です。</p><pre class="programlisting">#include &lt;stdlib.h&gt;
+int posix_memalign(void **memptr, size_t alignment, size_t size);</pre><p>　size 引数は割り当てサイズを指定します。</p><p>　posix_memalign の割り当てたメモリーのアドレスは *memptr に設定されます。</p><p>　alignment 引数には 2 の累乗数または 「 sizeof(void *) 」の倍数である必要があります。</p><p>　後は類似品となる C11 標準規格の aligned_alloc ですね。</p><pre class="programlisting">#include &lt;stdlib.h&gt;
+void *aligned_alloc(size_t alignment, size_t size);</pre><p>　この 2 つの関数がやることはどちらも同じです。</p><p>　アラインメントのとれたヒープ領域を割り当てることです。</p><p>　ではやってみましょう。</p><p><strong>main.c. </strong>
+</p><pre class="programlisting">  1 #include &lt;stdlib.h&gt;
+  2 #include &lt;stdio.h&gt;
+  3
+  4 int main()
+  5 {
+  6   void *ptr;
+  7
+  8   printf("0x%lx\n",(unsigned long)&amp;ptr);
+  9   int ret = posix_memalign(&amp;ptr,16,sizeof(int));
+ 10   if(ret != 0){
+ 11     perror("posix_memalign");
+ 12     exit(1);
+ 13   }
+ 14   printf("0x%lx\n",(unsigned long)ptr);
+ 15
+ 16   free(ptr);
+ 17   return 0;
+ 18 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+0x7ffd362ca8d0
+0x562945727670</pre><p>
+</p><p>　このコードは単に 16 バイト境界でヒープ領域のアドレス割り当てをしてるだけです。</p><p>　アラインメントとメモリー割り当てをやってる箇所は以下の部分ですね。</p><pre class="programlisting">  9   int ret = posix_memalign(&amp;ptr,16,sizeof(int));
+ 10   if(ret != 0){
+ 11     perror("posix_memalign");
+ 12     exit(1);
+ 13   }</pre><p>　alignment 引数は 16 バイト、 size 引数は sizeof(int) になっていますね。</p><p>　それと posix_memalign() は割り当てに成功すると 0 を返すので ret が 0 以外の時は失敗したものとみなせます。</p><p>　まあ posix_memalign() は後でもっと説明していくので深入りする前に aligned_alloc() の簡単な実装をやっつけちゃいましょう。</p><pre class="programlisting">  1 #include &lt;stdlib.h&gt;
+  2 #include &lt;stdio.h&gt;
+  3
+  4 int main()
+  5 {
+  6   void *ptr;
+  7   ptr = aligned_alloc(8,sizeof(int));
+  8   printf("0x%lx\n",(unsigned long)ptr);
+  9   free(ptr);
+ 10   return 0;
+ 11 }</pre><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+0x562fc1b6a260</pre><p>
+</p><p>　aligned_alloc() をコールしてるのは以下の箇所です。</p><pre class="programlisting">  7   ptr = aligned_alloc(8,sizeof(int));</pre><p>　alignment 引数は 8 で、 size 引数は sizeof(int) で前の項目とは違い 8 バイト境界に設定しようとしています。</p><p>　でも、実際は筆者の環境では 16 バイト境界としてアラインされてしまいます。</p><p>　少なくとも執筆時の glibc の実装では aligned_alloc も posix_memalign でも結果は同じ 16 バイト境界になります。</p><p>　ではなんでこうなるのか、少しだけ解明したいので、次の項目で軽く glibc のソースを読んで行きたいと思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch53s01.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch54s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

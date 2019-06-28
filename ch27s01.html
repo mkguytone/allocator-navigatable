@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>27.1. gdb で sbrk() の解析</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch27.html" title="第27章 brk / sbrk (unistd.h)" /><link rel="prev" href="ch27.html" title="第27章 brk / sbrk (unistd.h)" /><link rel="next" href="ch27s02.html" title="27.2. strace によって brk() / malloc() のコールをチェック" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch27.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch27s02.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_gdb_で_sbrk_の解析"></a>27.1. gdb で sbrk() の解析</h2></div></div></div><p>　sbrk() の振る舞いはソコソコ説明できたと思います。</p><p>　なのでもう少し内部の突っ込んだ部分も検証したいですね。</p><p>　それで検証としては gdb が適していると思います。</p><p>　では gdb でプログラムの内部の検証もやってみましょう。</p><pre class="programlisting">$ gdb ./a.out
+(gdb) break main
+Breakpoint 1 at 0x772: file main.cpp, line 9.
+(gdb) run
+Starting program: /home/komatsu/allocator/brk/a.out
+
+Breakpoint 1, main () at main.cpp:9
+9         std::printf("initial sbrk: 0x%lx\n",(unsigned long)sbrk(0));
+(gdb) info proc mappings
+process 19447
+Mapped address spaces:
+
+          Start Addr           End Addr       Size     Offset objfile
+      0x555555554000     0x555555555000     0x1000        0x0 /home/komatsu/allocator/brk/a.out
+      0x555555754000     0x555555755000     0x1000        0x0 /home/komatsu/allocator/brk/a.out
+      0x555555755000     0x555555756000     0x1000     0x1000 /home/komatsu/allocator/brk/a.out</pre><p>　「info proc mappings」はメモリーレイアウトを表示してくれます。</p><p>　注目すべきはこの時点でヒープらしき領域がメモリーレイアウトにないことですかね。</p><p>　では sbrk() 関数を使うとメモリーレイアウトに変化がないか試してみたいと思います。</p><pre class="programlisting">(gdb) n
+initial sbrk: 0x555555756000</pre><p>　この「 0x555555756000 」は「 /home/komatsu/allocator/brk/a.out 」の終端アドレスと同じですね。</p><p>　つまりこのアドレスから</p><pre class="programlisting">10        int *p = (int*)std::malloc(sizeof(int));
+(gdb) info proc mappings
+process 19447
+Mapped address spaces:
+
+          Start Addr           End Addr       Size     Offset objfile
+      0x555555554000     0x555555555000     0x1000        0x0 /home/komatsu/allocator/brk/a.out
+      0x555555754000     0x555555755000     0x1000        0x0 /home/komatsu/allocator/brk/a.out
+      0x555555755000     0x555555756000     0x1000     0x1000 /home/komatsu/concurrent/cpp17_test/allocator/brk/a.out
+      0x555555756000     0x555555777000    0x21000        0x0 [heap]
+//以下、出力は割愛
+(gdb) n
+11        std::printf("malloc'd address: 0x%lx\n",(unsigned long)p);
+(gdb) n
+malloc'd address: 0x555555756670</pre><p>　ここで重要となる行です。</p><pre class="programlisting">      0x555555756000     0x555555777000    0x21000        0x0 [heap]</pre><p>　「 0x21000 」 の領域が確保されてますが 10 進数に直したサイズは「 135168 」バイトとなります。</p><p>　この時点では malloc() は次に実行するコマンドなので malloc() での領域確保はコールしてません…</p><p>　どうして…　(´・ω・｀)</p><p>　まあ、これは cstdio ヘッダーまたは stdio.h ヘッダーの printf() 関数をコールした結果としてバックグランドでヒープにメモリーが確保されたんだと筆者は考えています。</p><p>　ええ…　たぶんそうです…</p><p>　では今度は malloc() を明示的に呼び出してレイアウトをチェックしましょう。</p><pre class="programlisting">12        std::printf("second sbrk: 0x%lx\n",(unsigned long)sbrk(0));
+(gdb) n
+second sbrk: 0x555555777000</pre><p>　このように「initial sbrk: 0x555555756000」から「second sbrk: 0x555555777000」というように動いてます。</p><p>　malloc() は「 malloc’d address: 0x555555756670 」というように</p><pre class="programlisting">13        int *w = (int*)std::malloc(sizeof(int)*8192*1024);
+(gdb) n
+14        if(w == nullptr)
+(gdb) n
+16        std::printf("malloc'd address: 0x%lx\n",(unsigned long)w);
+(gdb) n
+malloc'd address: 0x7ffff59e3010
+17        std::printf("third sbrk: 0x%lx\n",(unsigned long)sbrk(0));
+(gdb) info proc mapp
+process 18340
+Mapped address spaces:
+
+          Start Addr           End Addr       Size     Offset objfile
+      0x555555554000     0x555555555000     0x1000        0x0 /home/komatsu/allocator/brk/a.out
+      0x555555754000     0x555555755000     0x1000        0x0 /home/komatsu/allocator/brk/a.out
+      0x555555755000     0x555555756000     0x1000     0x1000 /home/komatsu/allocator/brk/a.out
+      0x555555756000     0x555555777000    0x21000        0x0 [heap]
+      0x7ffff59e3000     0x7ffff79e4000  0x2001000        0x0
+//以下、出力は割愛</pre><p>　「 0x2001000 」を10進数に直すと「33558528」になります。</p><p>　実は「 33558528 」は 8192×1024×4 の計算結果です。</p><p>　このサイズは 128KiB を超えるので malloc() ではなく mmap() が代わりにコールされます。</p><p>　その証拠として新たに作られた領域はアドレスがヒープ領域よりかなり上位のアドレスです。</p><pre class="programlisting">      0x7ffff59e3000     0x7ffff79e4000  0x2001000        0x0</pre><p>　最後の方は特に代り映えしませんが free() によってメモリーを解放後の状態はチェックしてみると良いかもしれないです。</p><pre class="programlisting">(gdb) n
+third sbrk: 0x7ffff59e3010
+18        int *v = (int*)std::malloc(sizeof(int)*8192*1024*1024);
+(gdb) n
+19        if(v == nullptr)
+(gdb) n
+20          perror("allocation error v");
+(gdb) n
+allocation error v: Cannot allocate memory
+21        std::printf("final sbrk: 0x%lx\n",(unsigned long)sbrk(0));
+(gdb) n
+final sbrk: 0x555555777000
+22        std::free(p);
+(gdb) n
+23        std::free(w);
+(gdb) n
+24      }
+(gdb) info proc mapping
+process 18340
+Mapped address spaces:
+
+          Start Addr           End Addr       Size     Offset objfile
+      0x555555554000     0x555555555000     0x1000        0x0 /home/komatsu/allocator/brk/a.out
+      0x555555754000     0x555555755000     0x1000        0x0 /home/komatsu/allocator/brk/a.out
+      0x555555755000     0x555555756000     0x1000     0x1000 /home/komatsu/allocator/brk/a.out
+      0x555555756000     0x555555777000    0x21000        0x0 [heap]</pre><p>　free() 関数でメモリー領域を解放すると「 33558528 」をサイズとした領域が消えてますね。</p><p>　mmap() の領域は独自の領域なのでヒープとは別にアンマップされます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch27.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch27.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch27s02.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第52章 realloc()</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch51.html" title="第51章 calloc()" /><link rel="next" href="ch53.html" title="第53章 alloca() 関数" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch51.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch53.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_realloc"></a>第52章 realloc()</h2></div></div></div><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+realloc を使えば領域の使い回しができる
+</li></ul></div><p>　あまり良いアイデアとは思えませんが、配列の長さを変えたいという時もあるでしょう。</p><p>　realloc() は一度割り当て済みのヒープ領域のサイズを変更してくれる関数です。</p><pre class="programlisting">#include &lt;stdlib.h&gt;
+void *realloc(void *ptr, size_t size);</pre><p>　ptr は元になるヒープ領域のアドレスとなり、size は新たなサイズです。</p><p>　realloc() は調整後のヒープ領域のアドレスを指す void ポインターを返します。</p><p>　だとすると ptr ってどうなっちゃうの？</p><p>　てな疑問が出てくるでしょうが、これはコードを見ながら検証するほうが早いので、早速のサンプルコードです。</p><p><strong>main.c. </strong>
+</p><pre class="programlisting">  1 #include &lt;stdlib.h&gt;
+  2 #include &lt;stdio.h&gt;
+  3
+  4 int main()
+  5 {
+  6   int *old_ptr;
+  7   int *new_ptr;
+  8   int i;
+  9
+ 10   old_ptr = malloc(sizeof(int)*3);
+ 11   for(i = 0; i &lt; 3; i++)
+ 12     old_ptr[i] = i;
+ 13   new_ptr = realloc(old_ptr,sizeof(int)*4);
+ 14   *(new_ptr+3) = 3;
+ 15   for(i = 0; i &lt; 4; i++)
+ 16     printf("%d\n",new_ptr[i]);
+ 17   free(new_ptr);
+ 18   return 0;
+ 19 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+0
+1
+2
+3</pre><p>
+</p><p>　このコードがやってるのは要素 3 個の整数型配列を、要素 4 個の整数型配列に調整しているところです。</p><pre class="programlisting"> 10   old_ptr = malloc(sizeof(int)*3);
+ 11   for(i = 0; i &lt; 3; i++)
+ 12     old_ptr[i] = i;</pre><p>　old_ptr は要素 3 個の配列で (0,1,2) の値が代入されます。</p><pre class="programlisting"> 13   new_ptr = realloc(old_ptr,sizeof(int)*4);
+ 14   *(new_ptr+3) = 3;</pre><p>　new_ptr には realloc() によってアドレスが整数型 4 個分に変更されます。</p><p>　値が (0,1,2,3) の順序配列となります</p><pre class="programlisting"> 15   for(i = 0; i &lt; 4; i++)
+ 16     printf("%d\n",new_ptr[i]);
+ 17   free(new_ptr);</pre><p>　最後に新たに割り当てた new_ptr の中身をチェックしてから free() で解放します。</p><p>　ちなみに old_ptr は解放済みと考えるようにしてください。</p><p>　つまり free(old_ptr) は既に行われたと考えてください。</p><p>　次のコードでは realloc() のメモリー管理の理解を少し深めるために realloc() で元のポインターのアドレスがどうなるかのチェックしています。</p><p><strong>main.c. </strong>
+</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+  2 #include &lt;stdlib.h&gt;
+  3
+  4 int main()
+  5 {
+  6   int *old_foo;
+  7   int *new_foo;
+  8   int *ptr;
+  9
+ 10   old_foo = malloc(sizeof(int)*2);
+ 11   printf("old_foo: 0x%lx\n",(unsigned long)old_foo);
+ 12   new_foo = realloc(old_foo,sizeof(int)*100);
+ 13   printf("new_foo: 0x%lx\n",(unsigned long)new_foo);
+ 14   ptr = malloc(sizeof(int));
+ 15   printf("ptr:     0x%lx\n",(unsigned long)ptr);
+ 16   free(new_foo);
+ 17   free(ptr);
+ 18
+ 19   return 0;
+ 20 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ gcc main.c
+$ ./a.out
+old_foo: 0x55db9b550260
+new_foo: 0x55db9b550690
+ptr:     0x55db9b550260</pre><p>
+</p><p>　このコードは 2 個の要素を保持する整数型の配列を 100 個の要素に拡張しています。</p><pre class="programlisting"> 10   old_foo = malloc(sizeof(int)*2);
+ 11   printf("old_foo: 0x%lx\n",(unsigned long)old_foo);</pre><p>　old_foo は元の配列ですね。</p><p>　「 0x55db9b550260 」が old_foo のアドレスになります。</p><pre class="programlisting"> 12   new_foo = realloc(old_foo,sizeof(int)*100);
+ 13   printf("new_foo: 0x%lx\n",(unsigned long)new_foo);</pre><p>　old_foo を realloc() で拡張したものを new_foo に代入します。</p><p>　new_foo のアドレスは「 0x55db9b550690 」となるので、old_foo とは異なる新たな領域に new_foo が割り当てられたことがわかります。</p><pre class="programlisting"> 14   ptr = malloc(sizeof(int));
+ 15   printf("ptr:     0x%lx\n",(unsigned long)ptr);</pre><p>　最後に ptr という新たな整数を malloc() でヒープ領域に確保します。</p><p>　アドレスは「 0x55db9b550260 」となりますが、このアドレスは old_foo で使用済みのアドレスとなります。</p><p>　つまり realloc で不要となった古いアドレスは再利用されているということですね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch51.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch53.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第50章 free() の実装</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch49s01.html" title="49.1. _int_malloc() 関数" /><link rel="next" href="ch51.html" title="第51章 calloc()" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch49s01.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch51.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_free_の実装"></a>第50章 free() の実装</h2></div></div></div><p>　free() を呼び出すのは「 __libc_free() 」関数をコールするのと同じことです。</p><pre class="programlisting">5578 strong_alias (__libc_free, __free) strong_alias (__libc_free, free)</pre><p>　では __libc_free() の中身を確認してみましょう。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">3084 void
+3085 __libc_free (void *mem)
+3086 {
+3087   mstate ar_ptr;
+3088   mchunkptr p;                          /* chunk corresponding to mem */
+3089
+3090   void (*hook) (void *, const void *)
+3091     = atomic_forced_read (__free_hook);
+3092   if (__builtin_expect (hook != NULL, 0))
+3093     {
+3094       (*hook)(mem, RETURN_ADDRESS (0));
+3095       return;
+3096     }
+3097
+3098   if (mem == 0)                              /* free(0) has no effect */
+3099     return;
+3100
+3101   p = mem2chunk (mem);
+3102
+3103   if (chunk_is_mmapped (p))                       /* release mmapped memory. */
+3104     {
+3105       /* See if the dynamic brk/mmap threshold needs adjusting.
+3106    Dumped fake mmapped chunks do not affect the threshold.  */
+3107       if (!mp_.no_dyn_threshold
+3108           &amp;&amp; chunksize_nomask (p) &gt; mp_.mmap_threshold
+3109           &amp;&amp; chunksize_nomask (p) &lt;= DEFAULT_MMAP_THRESHOLD_MAX
+3110     &amp;&amp; !DUMPED_MAIN_ARENA_CHUNK (p))
+3111         {
+3112           mp_.mmap_threshold = chunksize (p);
+3113           mp_.trim_threshold = 2 * mp_.mmap_threshold;
+3114           LIBC_PROBE (memory_mallopt_free_dyn_thresholds, 2,
+3115                       mp_.mmap_threshold, mp_.trim_threshold);
+3116         }
+3117       munmap_chunk (p);
+3118       return;
+3119     }
+3120
+3121   MAYBE_INIT_TCACHE ();
+3122
+3123   ar_ptr = arena_for_chunk (p);
+3124   _int_free (ar_ptr, p, 0);
+3125 }
+3126 libc_hidden_def (__libc_free)</pre><p>
+</p><p>　この中で重要なのは言うまでもなく以下の行でうｓ．</p><pre class="programlisting">3124   _int_free (ar_ptr, p, 0);</pre><p>　最終的には _int_free() 関数をコールしてますね。</p><p>　もう一つは mmap() で割り当てた大きめのメモリー領域は munmap_chunk() 関数で解放しています。</p><pre class="programlisting">3103   if (chunk_is_mmapped (p))                       /* release mmapped memory. */
+3104     {
+3105       /* See if the dynamic brk/mmap threshold needs adjusting.
+3106    Dumped fake mmapped chunks do not affect the threshold.  */
+3107       if (!mp_.no_dyn_threshold
+3108           &amp;&amp; chunksize_nomask (p) &gt; mp_.mmap_threshold
+3109           &amp;&amp; chunksize_nomask (p) &lt;= DEFAULT_MMAP_THRESHOLD_MAX
+3110     &amp;&amp; !DUMPED_MAIN_ARENA_CHUNK (p))
+3111         {
+3112           mp_.mmap_threshold = chunksize (p);
+3113           mp_.trim_threshold = 2 * mp_.mmap_threshold;
+3114           LIBC_PROBE (memory_mallopt_free_dyn_thresholds, 2,
+3115                       mp_.mmap_threshold, mp_.trim_threshold);
+3116         }
+3117       munmap_chunk (p);
+3118       return;
+3119     }</pre><p>　_int_free() 関数については時間の制約もあるので、次版を出すタイミングにもしかしたら説明できるかもしれません…</p><p>　次版の頃には glibc-2.27 が古くなってそうですけど…</p><p>　(´・ω・｀)</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch49s01.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch51.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

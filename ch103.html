@@ -1,0 +1,367 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第103章 カスタムアロケーターによるブロック管理</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt13.html" title="パート XIII. mmap() を使ったカスタムアロケーター" /><link rel="prev" href="ch102.html" title="第102章 ユーザーによるオブジェクト管理を前提にするカスタムページアロケーター" /><link rel="next" href="pt14.html" title="パート XIV. （おまけ）アロケーターのポリモーフィズム" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch102.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt14.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_カスタムアロケーターによるブロック管理"></a>第103章 カスタムアロケーターによるブロック管理</h2></div></div></div><p>　ブロック管理をアロケーターは、スタックやヒープアロケーターの実装をそのまま mmap() で割り当てたバッァーに当てはめるだけで作れます。</p><p>　まずブロックで割り当てするのは、前の章でやってきたスタックアロケーターといったものと本質的には変わらないです。</p><p>　そもそもファイルマッピングを除外すれば mmap() によるアノニマスマッピングは裏で行われてしまっているからです。</p><p>　見方によっては実装は前のより楽です。</p><p>　では実装例を見てみましょう。</p><p><strong>main.cpp. </strong>
+</p><pre class="programlisting">  1 #include &lt;memory&gt;
+  2 #include &lt;string&gt;
+  3 #include &lt;map&gt;
+  4 #include &lt;cerrno&gt;
+  5 #include &lt;vector&gt;
+  6 #include &lt;cmath&gt;
+  7 #include &lt;cstdio&gt;
+  8 #include &lt;fcntl.h&gt;
+  9 #include &lt;sys/mman.h&gt;
+ 10 #include &lt;sys/stat.h&gt;
+ 11 #include &lt;sys/types.h&gt;
+ 12 #include &lt;unistd.h&gt;
+ 13
+ 14 template&lt;size_t AreaSize, size_t BlockSize&gt;
+ 15 class shared_mmap_allocator {
+ 16
+ 17   typedef std::size_t size_type;
+ 18   typedef std::map&lt;void*, size_type&gt; size_map_t;
+ 19   typedef std::map&lt;size_type, std::vector&lt;void*&gt;&gt; free_list_t;
+ 20
+ 21   size_t page_round_up(size_t sz) {
+ 22     return (sz + M_page_size_ - 1) &amp; (~(M_page_size_ - 1));
+ 23   }
+ 24
+ 25 public:
+ 26
+ 27   shared_mmap_allocator() = delete;
+ 28   shared_mmap_allocator(int fd) :
+ 29     M_fd_(fd),
+ 30     M_total_mapped_size_(page_round_up(AreaSize)),
+ 31     M_block_size_(BlockSize),
+ 32     M_pool_index_(0)
+ 33   {
+ 34     M_mem_pool_ = static_cast&lt;std::byte*&gt;(mmap(
+ 35       0,
+ 36       M_total_mapped_size_,
+ 37       PROT_READ | PROT_WRITE,
+ 38       MAP_SHARED,
+ 39       M_fd_,
+ 40       0));
+ 41     std::printf("mmap: %p\n",M_mem_pool_);
+ 42   }
+ 43
+ 44   ~shared_mmap_allocator() {
+ 45     munmap(M_mem_pool_,M_total_mapped_size_);
+ 46   }
+ 47
+ 48   void* allocate(size_t n) {
+ 49
+ 50     auto chunk_size = n * M_block_size_;
+ 51     void *pblock = nullptr;
+ 52
+ 53     auto&amp; free_chunks = M_free_list_[chunk_size];
+ 54     if (!free_chunks.empty()) {
+ 55
+ 56       pblock = free_chunks.back();
+ 57       free_chunks.pop_back();
+ 58       std::printf("reuse pointer: %p\n",pblock);
+ 59       return pblock;
+ 60
+ 61     } else if(M_total_mapped_size_ &gt;= M_block_size_ * M_pool_index_) {
+ 62
+ 63       pblock = static_cast&lt;void*&gt;(M_mem_pool_ + M_block_size_ * M_pool_index_);
+ 64       M_pool_index_ += n;
+ 65       M_size_map_[pblock] = chunk_size;
+ 66       std::printf("allocate: %p\n",pblock);
+ 67
+ 68     } else {
+ 69       std::perror("Request size out of buffer");
+ 70       return nullptr;
+ 71     }
+ 72
+ 73     return pblock;
+ 74   }
+ 75
+ 76   void deallocate(void* p, size_t ) {
+ 77     auto chunk_size = M_size_map_[(void*)p];
+ 78     M_free_list_[chunk_size].push_back((void*)p);
+ 79     std::printf("deallocate: %p\n",p);
+ 80   }
+ 81
+ 82  private:
+ 83   const int M_page_size_ = sysconf(_SC_PAGE_SIZE);
+ 84   const int M_fd_;
+ 85   const size_t M_total_mapped_size_;
+ 86   const size_t M_block_size_;
+ 87   size_t M_pool_index_;
+ 88   size_map_t M_size_map_;
+ 89   free_list_t M_free_list_;
+ 90   std::byte* M_mem_pool_;
+ 91 };
+ 92
+ 93 template&lt;typename T&gt;
+ 94 class block_allocator {
+ 95   using value_type = T;
+ 96   using pointer = T*;
+ 97   using const_pointer = const T*;
+ 98   using reference = T&amp;;
+ 99   using const_reference = const T&amp;;
+100   using size_type = std::size_t;
+101   using difference_type = off_t;
+102
+103 public:
+104   template &lt;class U&gt;
+105   struct rebind {
+106     typedef block_allocator&lt;U&gt; other;
+107   };
+108
+109   static block_allocator* create_allocator(std::string filename) {
+110     int fd = open(filename.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0644);
+111     if (fd == -1) {
+112       return nullptr;
+113     }
+114     return new block_allocator(fd);
+115   }
+116
+117   block_allocator(int fd) : M_shared_mmap_allocator_(fd)
+118   {}
+119
+120   template &lt;class U&gt;
+121   block_allocator(const block_allocator&lt;U&gt;&amp; ){}
+122
+123   pointer allocate(size_t n) {
+124     return reinterpret_cast&lt;pointer&gt;(M_shared_mmap_allocator_.allocate(n));
+125   }
+126
+127   void deallocate(void *p, size_t n){
+128     M_shared_mmap_allocator_.deallocate(p,n);
+129   }
+130
+131   void construct(pointer p, const_reference val) {
+132     new ((void*)p) T(val);
+133   }
+134
+135   void destroy(pointer p) { p-&gt;~T(); }
+136
+137   template &lt;class U, class... Args&gt;
+138   void construct(U* p, Args&amp;&amp;... args) {
+139     ::new ((void*)p) U(std::forward&lt;Args&gt;(args)...);
+140   }
+141
+142   template &lt;class U&gt;
+143   void destroy(U* p) {
+144     p-&gt;~U();
+145   }
+146
+147 private:
+148   shared_mmap_allocator&lt;100000,32&gt; M_shared_mmap_allocator_;
+149 };
+150
+151 int main()
+152 {
+153   block_allocator&lt;void*&gt;* ba = block_allocator&lt;void*&gt;::create_allocator("abc.txt");
+154
+155   void* ptr[20];
+156
+157   for(int i = 0; i &lt; 5; ++i){
+158     ptr[i] = ba-&gt;allocate(1);
+159   }
+160   for(int i = 1; i &lt; 5; ++i){
+161     ba-&gt;deallocate(ptr[i],1);
+162   }
+163   for(int i = 5; i &lt; 20; ++i){
+164     ptr[i] = ba-&gt;allocate(1);
+165   }
+166   for(int i = 1; i &lt; 5; ++i){
+167     ptr[i] = ba-&gt;allocate(2);
+168   }
+169
+170   delete ba;
+171
+172   return 0;
+173 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ g++ main.cpp -std=c++17 -g
+$ ./a.out
+mmap: 0x7f9ed28ea000
+allocate: 0x7f9ed28ea000
+allocate: 0x7f9ed28ea020
+allocate: 0x7f9ed28ea040
+allocate: 0x7f9ed28ea060
+allocate: 0x7f9ed28ea080
+deallocate: 0x7f9ed28ea020
+deallocate: 0x7f9ed28ea040
+deallocate: 0x7f9ed28ea060
+deallocate: 0x7f9ed28ea080
+reuse pointer: 0x7f9ed28ea080
+reuse pointer: 0x7f9ed28ea060
+reuse pointer: 0x7f9ed28ea040
+reuse pointer: 0x7f9ed28ea020
+allocate: 0x7f9ed28ea0a0
+allocate: 0x7f9ed28ea0c0
+allocate: 0x7f9ed28ea0e0
+allocate: 0x7f9ed28ea100
+allocate: 0x7f9ed28ea120
+allocate: 0x7f9ed28ea140
+allocate: 0x7f9ed28ea160
+allocate: 0x7f9ed28ea180
+allocate: 0x7f9ed28ea1a0
+allocate: 0x7f9ed28ea1c0
+allocate: 0x7f9ed28ea1e0
+allocate: 0x7f9ed28ea200
+allocate: 0x7f9ed28ea240
+allocate: 0x7f9ed28ea280
+allocate: 0x7f9ed28ea2c0</pre><p>
+</p><p>　まず block_allocator は前の項目とほぼ同じ実装です。</p><p>　実装で異なる箇所は shared_mmap_allocator のテンプレート引数とコンストラクターですかね。</p><pre class="programlisting"> 93 template&lt;typename T&gt;
+ 94 class block_allocator {
+
+ //  中略
+
+147 private:
+148   shared_mmap_allocator&lt;100000,32&gt; M_shared_mmap_allocator_;
+149 };</pre><p>　このように内部実装アロケーターには、新たにテンプレート引数が追加されています。</p><pre class="programlisting"> 14 template&lt;size_t AreaSize, size_t BlockSize&gt;
+ 15 class shared_mmap_allocator {
+ 16
+ 17   typedef std::size_t size_type;
+ 18   typedef std::map&lt;void*, size_type&gt; size_map_t;
+ 19   typedef std::map&lt;size_type, std::vector&lt;void*&gt;&gt; free_list_t;
+ 20
+ 21   size_t page_round_up(size_t sz) {
+ 22     return (sz + M_page_size_ - 1) &amp; (~(M_page_size_ - 1));
+ 23   }
+ 24
+ 25 public:
+ 26
+ 27   shared_mmap_allocator() = delete;
+ 28   shared_mmap_allocator(int fd) :
+ 29     M_fd_(fd),
+ 30     M_total_mapped_size_(page_round_up(AreaSize)),
+ 31     M_block_size_(BlockSize),
+ 32     M_pool_index_(0)
+ 33   {
+ 34     M_mem_pool_ = static_cast&lt;std::byte*&gt;(mmap(
+ 35       0,
+ 36       M_total_mapped_size_,
+ 37       PROT_READ | PROT_WRITE,
+ 38       MAP_SHARED,
+ 39       M_fd_,
+ 40       0));
+ 41     std::printf("mmap: %p\n",M_mem_pool_);
+ 42   }
+
+ //  中略
+
+ 82  private:
+ 83   const int M_page_size_ = sysconf(_SC_PAGE_SIZE);
+ 84   const int M_fd_;
+ 85   const size_t M_total_mapped_size_;
+ 86   const size_t M_block_size_;
+ 87   size_t M_pool_index_;
+ 88   size_map_t M_size_map_;
+ 89   free_list_t M_free_list_;
+ 90   std::byte* M_mem_pool_;
+ 91 };</pre><p>　テンプレート引数については 2 つあります。</p><pre class="programlisting"> 14 template&lt;size_t AreaSize, size_t BlockSize&gt;
+ 15 class shared_mmap_allocator {</pre><p>　AreaSize はマッピングするサイズの合計です。</p><p>　まあサイズの合計というのは大まかな数値で mmap() に使えるとは限らないので ページサイズの倍数にプログラム内で調整しないといけないですがね。</p><p>　例えば 100000 バイトぐらいをマッピングしたいなら、そう指定します。</p><pre class="programlisting">148   shared_mmap_allocator&lt;100000,32&gt; M_shared_mmap_allocator_;</pre><p>　BlockSize は一回に割り当てる最少サイズです。</p><p>　つまりソースコードの例だとブロックサイズが 32 バイトに設定されます。</p><p>　そしてこの 2 つのテンプレート引数は、以下のメンバー変数の値として代入されます。</p><pre class="programlisting"> 85   const size_t M_total_mapped_size_;
+ 86   const size_t M_block_size_;</pre><p>　代入はコンストラクターで行われます。</p><pre class="programlisting"> 28   shared_mmap_allocator(int fd) :
+ 29     M_fd_(fd),
+ 30     M_total_mapped_size_(page_round_up(AreaSize)),
+ 31     M_block_size_(BlockSize),
+ 32     M_pool_index_(0)
+ 33   {
+ 34     M_mem_pool_ = static_cast&lt;std::byte*&gt;(mmap(
+ 35       0,
+ 36       M_total_mapped_size_,
+ 37       PROT_READ | PROT_WRITE,
+ 38       MAP_SHARED,
+ 39       M_fd_,
+ 40       0));
+ 41     std::printf("mmap: %p\n",M_mem_pool_);
+ 42   }</pre><p>　ちなみに M_total_mapped_size_ は以下の関数によってページサイズの倍数となるように加工処理されます。</p><pre class="programlisting"> 21   size_t page_round_up(size_t sz) {
+ 22     return (sz + M_page_size_ - 1) &amp; (~(M_page_size_ - 1));
+ 23   }</pre><p>　筆者の環境だと 4096 バイトがページサイズとなりますが、以下のように 100000 を AreaSize に指定するとどうなるでしょうかね？</p><pre class="programlisting"> 30     M_total_mapped_size_(page_round_up(AreaSize)),</pre><p>　この結果は 102400 となります。</p><pre class="programlisting">(100000 + 4096 - 1) &amp; (~(4096 - 1)) =&gt; 102400</pre><p>　この M_total_mapped_size_ は mmap() で割り当てるサイズとなります。</p><p>　そして mmap() を使用する箇所です。</p><pre class="programlisting"> 34     M_mem_pool_ = static_cast&lt;std::byte*&gt;(mmap(
+ 35       0,
+ 36       M_total_mapped_size_,
+ 37       PROT_READ | PROT_WRITE,
+ 38       MAP_SHARED,
+ 39       M_fd_,
+ 40       0));</pre><p>　allocate() 関数でなくコンストラクターで割り当てをするのは、 mmap() のコールはこれ一回きりに限定したいからです。</p><p>　前の項目では allocate() 関数内で mmap() を使用して割り当てを行いましたが、これを力技で管理することもできないわけではないのですが、やはり該当するユーザーアプリケーションによりけりかと思いますね。</p><p>　この場合の実装は一回の mmap() で大量のメモリー領域を割り当て、後はその領域を管理していくというのが設計の基本思想となります。</p><p>　ではこれを念頭のうえで allocate() 関数を見てみましょう。</p><pre class="programlisting"> 48   void* allocate(size_t n) {
+ 49
+ 50     auto chunk_size = n * M_block_size_;
+ 51     void *pblock = nullptr;
+ 52
+ 53     auto&amp; free_chunks = M_free_list_[chunk_size];
+ 54     if (!free_chunks.empty()) {
+ 55
+ 56       pblock = free_chunks.back();
+ 57       free_chunks.pop_back();
+ 58       std::printf("reuse pointer: %p\n",pblock);
+ 59       return pblock;
+ 60
+ 61     } else if(M_total_mapped_size_ &gt;= M_block_size_ * M_pool_index_) {
+ 62
+ 63       pblock = static_cast&lt;void*&gt;(M_mem_pool_ + M_block_size_ * M_pool_index_);
+ 64       M_pool_index_ += n;
+ 65       M_size_map_[pblock] = chunk_size;
+ 66       std::printf("allocate: %p\n",pblock);
+ 67
+ 68     } else {
+ 69       std::perror("Request size out of buffer");
+ 70       return nullptr;
+ 71     }
+ 72
+ 73     return pblock;
+ 74   }
+ 75
+ 76   void deallocate(void* p, size_t ) {
+ 77     auto chunk_size = M_size_map_[(void*)p];
+ 78     M_free_list_[chunk_size].push_back((void*)p);
+ 79     std::printf("deallocate: %p\n",p);
+ 80   }</pre><p>　考え方としてはフリーチャンクがあれば使い、無ければメモリープールから適当なアドレスを算出します。</p><pre class="programlisting"> 53     auto&amp; free_chunks = M_free_list_[chunk_size];
+ 54     if (!free_chunks.empty()) {
+ 55
+ 56       pblock = free_chunks.back();
+ 57       free_chunks.pop_back();
+ 58       std::printf("reuse pointer: %p\n",pblock);
+ 59       return pblock;</pre><p>　後はアドレスの再利用をする時は「reuse pointer: アドレス」というように出力します。</p><p>　それと mmap() で割り当てた容量は超えないように if 文でチェックしています。</p><pre class="programlisting"> 61     } else if(M_total_mapped_size_ &gt;= M_block_size_ * M_pool_index_) {
+ 62
+ 63       pblock = static_cast&lt;void*&gt;(M_mem_pool_ + M_block_size_ * M_pool_index_);
+ 64       M_pool_index_ += n;
+ 65       M_size_map_[pblock] = chunk_size;
+ 66       std::printf("allocate: %p\n",pblock);</pre><p>　これはスタックアロケーターなんかと実装は変わらないですね。</p><p>　この箇所はログとして「allocate: アドレス」を出力します。</p><p>　では allocate() のチェックをしたいと思います。</p><pre class="programlisting">153   block_allocator&lt;void*&gt;* ba = block_allocator&lt;void*&gt;::create_allocator("abc.txt");
+154
+155   void* ptr[20];
+156
+157   for(int i = 0; i &lt; 5; ++i){
+158     ptr[i] = ba-&gt;allocate(1);
+159   }
+160   for(int i = 1; i &lt; 5; ++i){
+161     ba-&gt;deallocate(ptr[i],1);
+162   }
+163   for(int i = 5; i &lt; 20; ++i){
+164     ptr[i] = ba-&gt;allocate(1);
+165   }
+166   for(int i = 1; i &lt; 5; ++i){
+167     ptr[i] = ba-&gt;allocate(2);
+168   }
+169
+170   delete ba;</pre><p>　これの出力は以下のようになります。</p><pre class="programlisting">allocate: 0x7f9ed28ea000
+allocate: 0x7f9ed28ea020
+allocate: 0x7f9ed28ea040
+allocate: 0x7f9ed28ea060
+allocate: 0x7f9ed28ea080
+deallocate: 0x7f9ed28ea020
+deallocate: 0x7f9ed28ea040
+deallocate: 0x7f9ed28ea060
+deallocate: 0x7f9ed28ea080
+reuse pointer: 0x7f9ed28ea080
+reuse pointer: 0x7f9ed28ea060
+reuse pointer: 0x7f9ed28ea040
+reuse pointer: 0x7f9ed28ea020
+allocate: 0x7f9ed28ea0a0
+allocate: 0x7f9ed28ea0c0
+allocate: 0x7f9ed28ea0e0
+allocate: 0x7f9ed28ea100
+allocate: 0x7f9ed28ea120
+allocate: 0x7f9ed28ea140
+allocate: 0x7f9ed28ea160
+allocate: 0x7f9ed28ea180
+allocate: 0x7f9ed28ea1a0
+allocate: 0x7f9ed28ea1c0
+allocate: 0x7f9ed28ea1e0
+allocate: 0x7f9ed28ea200
+allocate: 0x7f9ed28ea240
+allocate: 0x7f9ed28ea280
+allocate: 0x7f9ed28ea2c0</pre><p>　まあアドレスはスタックに見えるかもしれませんが、 mmap() によって割り当てた Memory Region (メモリー領域) のアドレスです。</p><p>　5 回 32 バイトで割り当てして、4 回解放、さらに 15 回 allocate() 関数をコールして割り当てをしていますんで、4 回の再利用がおきてますね。</p><p>　さらに最後に 64 バイトで 4 回の割り当てをしてます。</p><p>　0x7f9ed28ea200、0x7f9ed28ea240、0x7f9ed28ea280、0x7f9ed28ea2c0 は 64 バイト間隔なので問題なく割り当てが出来ていると思いますね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch102.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt13.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="pt14.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

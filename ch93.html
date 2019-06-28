@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第93章 カスタムヒープアロケーター</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt10.html" title="パート X. ヒープ領域のアドレスに割り当て" /><link rel="prev" href="ch92.html" title="第92章 malloc を使ってヒープに割り当て" /><link rel="next" href="ch94.html" title="第94章 static オブジェクトはヒープっぽい領域に割り当てられるはず？" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch92.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch94.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_カスタムヒープアロケーター"></a>第93章 カスタムヒープアロケーター</h2></div></div></div><p>　malloc() を使って大きめの記憶域を先に割り当てるアロケーターは、前の項目で可能な事が判明したので、早速アロケーターを設計してみましょうかね。</p><p>　まず割り当てには malloc() や new を使わない点においてスタックアロケーターとは何も変わらないです。</p><p>　さらに言えばスタックアロケーターと　allocate() 関数の実装については特に変更は必要ないです。</p><p>　では実装してみましょう。</p><p><strong>main.cpp. </strong>
+</p><pre class="programlisting">  1 #include &lt;iostream&gt;
+  2 #include &lt;cassert&gt;
+  3 #include &lt;cstddef&gt;
+  4 #include &lt;cstdint&gt;
+  5 #include &lt;new&gt;
+  6 #include &lt;map&gt;
+  7 #include &lt;vector&gt;
+  8
+  9 #define MAX_OBJECTS 256
+ 10
+ 11 struct Foo {
+ 12   int x_,y_,z_;
+ 13   Foo(int x, int y, int z) :
+ 14     x_(x),y_(y),z_(z){}
+ 15 };
+ 16
+ 17 template&lt;typename T&gt;
+ 18 struct A {
+ 19   typedef T* pointer;
+ 20   typedef std::size_t size_type;
+ 21
+ 22   const size_t M_object_size_;
+ 23   unsigned M_count_;
+ 24   char* M_heap_;
+ 25
+ 26   using size_map = std::map&lt;void*,size_type&gt;;
+ 27   using free_map = std::map&lt;size_type,std::vector&lt;void*&gt;&gt;;
+ 28
+ 29   A() : M_count_(0), M_object_size_(sizeof(T) &lt; 8 ? sizeof(long long) : sizeof(T))
+ 30   {
+ 31     M_heap_ = (char*)std::malloc(MAX_OBJECTS*M_object_size_);
+ 32   }
+ 33
+ 34   ~A(){
+ 35     std::free(M_heap_);
+ 36     M_heap_ = nullptr;
+ 37   }
+ 38
+ 39   pointer allocate(size_type n = 1) {
+ 40     assert(M_count_ &lt;= MAX_OBJECTS);
+ 41     auto&amp; free_chunks = free_map_[n*M_object_size_];
+ 42     if(!free_chunks.empty()){
+ 43       T* available_block = static_cast&lt;T*&gt;(free_chunks.back());
+ 44       free_chunks.pop_back();
+ 45       std::cout &lt;&lt; "reuse pointer: " &lt;&lt; available_block &lt;&lt; " M_count_: " &lt;&lt; M_count_ &lt;&lt; '\n';
+ 46       return available_block;
+ 47     }
+ 48     M_count_ += n;
+ 49     void* pblock = static_cast&lt;void*&gt;(M_heap_ + (M_object_size_ * M_count_));
+ 50     size_map_[pblock] = n * M_object_size_;
+ 51     std::cout &lt;&lt; "new pointer: " &lt;&lt; pblock &lt;&lt; " M_count_: " &lt;&lt; M_count_ &lt;&lt; '\n';
+ 52     return reinterpret_cast&lt;T*&gt;(::new (pblock) char(n*M_object_size_));
+ 53   }
+ 54
+ 55   void deallocate(pointer p) {
+ 56     auto no_longer_in_use_chunks = size_map_[(void*)p];
+ 57     free_map_[no_longer_in_use_chunks].push_back((void*)p);
+ 58     std::printf("deallocate %p with size %lu\n",p,no_longer_in_use_chunks);
+ 59   }
+ 60
+ 61   template&lt;typename U, typename... Args&gt;
+ 62   void construct(U* p, Args&amp;&amp; ...args) {
+ 63     ::new ((void*)p) U(std::forward&lt;Args&gt;(args)...);
+ 64   }
+ 65
+ 66   template&lt;typename U&gt;
+ 67   void destroy(U* p) {
+ 68     p-&gt;~U();
+ 69   }
+ 70 private:
+ 71   size_map size_map_;
+ 72   free_map free_map_;
+ 73 };
+ 74
+ 75 int main()
+ 76 {
+ 77   A&lt;int&gt; a;
+ 78   int* d[10];
+ 79   A&lt;Foo&gt; f;
+ 80   Foo* foo[10];
+ 81   for(int i = 0; i &lt; 5; ++i) {
+ 82     auto size = i % 2 + 1;
+ 83     d[i] = a.allocate(size);
+ 84     foo[i] = f.allocate(size);
+ 85     a.construct(d[i],i);
+ 86     f.construct(foo[i],i,i,i);
+ 87   }
+ 88   for(int i = 2; i &lt; 5; ++i){
+ 89     a.deallocate(d[i]);
+ 90     f.deallocate(foo[i]);
+ 91   }
+ 92   for(int i = 5; i &lt; 10; ++i){
+ 93     d[i] = a.allocate(2);
+ 94     foo[i] = f.allocate(2);
+ 95   }
+ 96   return 0;
+ 97 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ g++ main.cpp
+$ ./a.out
+new pointer: 0x56342fb05e78 M_count_: 1
+new pointer: 0x56342fb0668c M_count_: 1
+new pointer: 0x56342fb05e88 M_count_: 3
+new pointer: 0x56342fb066a4 M_count_: 3
+new pointer: 0x56342fb05e90 M_count_: 4
+new pointer: 0x56342fb066b0 M_count_: 4
+new pointer: 0x56342fb05ea0 M_count_: 6
+new pointer: 0x56342fb066c8 M_count_: 6
+new pointer: 0x56342fb05ea8 M_count_: 7
+new pointer: 0x56342fb066d4 M_count_: 7
+deallocate 0x56342fb05e90 with size 8
+deallocate 0x56342fb066b0 with size 12
+deallocate 0x56342fb05ea0 with size 16
+deallocate 0x56342fb066c8 with size 24
+deallocate 0x56342fb05ea8 with size 8
+deallocate 0x56342fb066d4 with size 12
+reuse pointer: 0x56342fb05ea0 M_count_: 7
+reuse pointer: 0x56342fb066c8 M_count_: 7
+new pointer: 0x56342fb05eb8 M_count_: 9
+new pointer: 0x56342fb066ec M_count_: 9
+new pointer: 0x56342fb05ec8 M_count_: 11
+new pointer: 0x56342fb06704 M_count_: 11
+new pointer: 0x56342fb05ed8 M_count_: 13
+new pointer: 0x56342fb0671c M_count_: 13
+new pointer: 0x56342fb05ee8 M_count_: 15
+new pointer: 0x56342fb06734 M_count_: 15</pre><p>
+</p><p>　アロケーターの状態には、オブジェクト数をキープする M_count_ 変数と、オブジェクトサイズを保持する M_object_size_ があります。</p><pre class="programlisting"> 17 template&lt;typename T&gt;
+ 18 struct A {
+ 19   typedef T* pointer;
+ 20   typedef std::size_t size_type;
+ 21
+ 22   const size_t M_object_size_;
+ 23   unsigned M_count_;
+ 24   char* M_heap_;
+ 25
+ 26   using size_map = std::map&lt;void*,size_type&gt;;
+ 27   using free_map = std::map&lt;size_type,std::vector&lt;void*&gt;&gt;;
+
+//中略
+
+ 70 private:
+ 71   size_map size_map_;
+ 72   free_map free_map_;
+ 73 };</pre><p>　M_heap_ はヒープで割り当てる記憶域ですが、ヒープはコンストラクターを呼び出す一回に限り malloc() で割り当てます。</p><pre class="programlisting"> 29   A() : M_count_(0), M_object_size_(sizeof(T) &lt; 8 ? sizeof(long long) : sizeof(T))
+ 30   {
+ 31     M_heap_ = (char*)std::malloc(MAX_OBJECTS*M_object_size_);
+ 32   }
+ 33
+ 34   ~A(){
+ 35     std::free(M_heap_);
+ 36     M_heap_ = nullptr;
+ 37   }</pre><p>　オブジェクトサイズについては、テンプレートパラメーター T のバイトサイズが 8 を下回る場合は強制的に 8 に設定します。</p><p>　long long は 8 バイトになるはずなので、そのバイトサイズを設定するか、T のバイトサイズをオブジェクトサイズとします。</p><p>　後はコンストラクター時に M_heap_ に割り当てたヒープ領域のメモリーはデストラクタ―で解放します。</p><p>　allocate() については M_heap_ のアドレスを起点として新たなアドレスを割り当てたり、解放していきます。</p><pre class="programlisting"> 39   pointer allocate(size_type n = 1) {
+ 40     assert(M_count_ &lt;= MAX_OBJECTS);
+ 41     auto&amp; free_chunks = free_map_[n*M_object_size_];
+ 42     if(!free_chunks.empty()){
+ 43       T* available_block = static_cast&lt;T*&gt;(free_chunks.back());
+ 44       free_chunks.pop_back();
+ 45       std::cout &lt;&lt; "reuse pointer: " &lt;&lt; available_block &lt;&lt; " M_count_: " &lt;&lt; M_count_ &lt;&lt; '\n';
+ 46       return available_block;
+ 47     }
+ 48     M_count_ += n;
+ 49     void* pblock = static_cast&lt;void*&gt;(M_heap_ + (M_object_size_ * M_count_));
+ 50     size_map_[pblock] = n * M_object_size_;
+ 51     std::cout &lt;&lt; "new pointer: " &lt;&lt; pblock &lt;&lt; " M_count_: " &lt;&lt; M_count_ &lt;&lt; '\n';
+ 52     return reinterpret_cast&lt;T*&gt;(::new (pblock) char(n*M_object_size_));
+ 53   }</pre><p>　まず最初にフリーリスト内にチャンクがないかチェックします。</p><pre class="programlisting"> 41     auto&amp; free_chunks = free_map_[n*M_object_size_];
+ 42     if(!free_chunks.empty()){</pre><p>　allocate() の引数である n は要求されている要素数なので、アロケーターへのリクエストサイズは n*M_object_size_ となりますね。</p><p>　もしチャンクが空であれば、そのまま新たなアドレスを割り振ります。</p><pre class="programlisting"> 48     M_count_ += n;
+ 49     void* pblock = static_cast&lt;void*&gt;(M_heap_ + (M_object_size_ * M_count_));
+ 50     size_map_[pblock] = n * M_object_size_;
+ 51     std::cout &lt;&lt; "new pointer: " &lt;&lt; pblock &lt;&lt; " M_count_: " &lt;&lt; M_count_ &lt;&lt; '\n';
+ 52     return reinterpret_cast&lt;T*&gt;(::new (pblock) char(n*M_object_size_));
+ 53   }</pre><p>　M_count_ はアロケーターの新規割り当てに使ったブロックの合計なので、それにブロックサイズである M_object_size_ をかけたものを M_heap_ に加算すれば、新規割り当てに使えるアドレスを算出できます。</p><p>　仮にフリーリスト（フリーチャンクのリスト）が空でない場合は、リクエストサイズと同じサイズのリストを検索します。</p><pre class="programlisting"> 42     if(!free_chunks.empty()){
+ 43       T* available_block = static_cast&lt;T*&gt;(free_chunks.back());
+ 44       free_chunks.pop_back();
+ 45       std::cout &lt;&lt; "reuse pointer: " &lt;&lt; available_block &lt;&lt; " M_count_: " &lt;&lt; M_count_ &lt;&lt; '\n';
+ 46       return available_block;
+ 47     }</pre><p>　検索にマッチするサイズのフリーチャンクがあれば、それを再利用して返します。</p><p>　後は deallocate() も軽く説明しておきますね。</p><pre class="programlisting"> 55   void deallocate(pointer p) {
+ 56     auto no_longer_in_use_chunks = size_map_[(void*)p];
+ 57     free_map_[no_longer_in_use_chunks].push_back((void*)p);
+ 58     std::printf("deallocate %p with size %lu\n",p,no_longer_in_use_chunks);
+ 59   }</pre><p>　不要になり解放したいポインター p については size_map_ を使って、割り当て時にリクエストされたサイズを照合します。</p><p>　照合されたサイズをキーにして、フリーリスト（フリーチャンクのリスト）にポインターを追加します。</p><p>　それとアロケーターのテストについては int 型と Foo 型の 2 パターンを用意しました。</p><p>　int 型は 4 バイトで Foo 型は 12 バイトのオブジェクトとしてヒープに割り当てをしますが、リクエストサイズは 8 バイトか 16 バイト、12 バイトか 24 バイトのいずれかのパターンとします。</p><pre class="programlisting"> 77   A&lt;int&gt; a;
+ 78   int* d[10];
+ 79   A&lt;Foo&gt; f;
+ 80   Foo* foo[10];</pre><p>　後は for ループを回してるだけですが、5 回割り当てをし、3 回解放、5 回割り当てというパターンを試すことで、適切な解放領域が再利用されるかチェックしてみます。</p><pre class="programlisting"> 81   for(int i = 0; i &lt; 5; ++i) {
+ 82     auto size = i % 2 + 1;
+ 83     d[i] = a.allocate(size);
+ 84     foo[i] = f.allocate(size);
+ 85     a.construct(d[i],i);
+ 86     f.construct(foo[i],i,i,i);
+ 87   }
+ 88   for(int i = 2; i &lt; 5; ++i){
+ 89     a.deallocate(d[i]);
+ 90     f.deallocate(foo[i]);
+ 91   }
+ 92   for(int i = 5; i &lt; 10; ++i){
+ 93     d[i] = a.allocate(2);
+ 94     foo[i] = f.allocate(2);
+ 95   }</pre><p>　出力結果については以下の部分で再利用が確認されています。</p><pre class="programlisting">deallocate 0x56342fb05e90 with size 8
+deallocate 0x56342fb066b0 with size 12
+deallocate 0x56342fb05ea0 with size 16
+deallocate 0x56342fb066c8 with size 24
+deallocate 0x56342fb05ea8 with size 8
+deallocate 0x56342fb066d4 with size 12
+reuse pointer: 0x56342fb05ea0 M_count_: 7
+reuse pointer: 0x56342fb066c8 M_count_: 7</pre><p>　つまり解放は各アロケーターに大して 3 回づつ行われてますが、実際に再利用されたのは 16 バイト（ 0x56342fb05ea0 ） と 24 バイト（ 0x56342fb066c8 ）のチャンクだけです。</p><pre class="programlisting"> 93     d[i] = a.allocate(2);
+ 94     foo[i] = f.allocate(2);</pre><p>　各 allocate() がリクエストするサイズが 16 バイトと 24 バイトだからです。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch92.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt10.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch94.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

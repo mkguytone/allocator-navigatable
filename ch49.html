@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第49章 malloc() の実装</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch48.html" title="第48章 malloc.c の内部関数" /><link rel="next" href="ch49s01.html" title="49.1. _int_malloc() 関数" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch48.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch49s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_malloc_の実装"></a>第49章 malloc() の実装</h2></div></div></div><p>　malloc() を呼び出すのは「 __libc_malloc() 」関数をコールするのと同じことです。</p><pre class="programlisting">5579 strong_alias (__libc_malloc, __malloc) strong_alias (__libc_malloc, malloc)</pre><p>　この strong_alias は共有ライブラリーのシンボルを指定が可能となっています。</p><p>　この場合は __libc_malloc のエイリアス（別名）は malloc ということですね。</p><p>　では __libc_malloc() の中身を確認してみましょう。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">3026 void *
+3027 __libc_malloc (size_t bytes)
+3028 {
+3029   mstate ar_ptr;
+3030   void *victim;
+3031
+3032   void *(*hook) (size_t, const void *)
+3033     = atomic_forced_read (__malloc_hook);
+3034   if (__builtin_expect (hook != NULL, 0))
+3035     return (*hook)(bytes, RETURN_ADDRESS (0));
+3036 #if USE_TCACHE
+3037   /* int_free also calls request2size, be careful to not pad twice.  */
+3038   size_t tbytes;
+3039   checked_request2size (bytes, tbytes);
+3040   size_t tc_idx = csize2tidx (tbytes);
+3041
+3042   MAYBE_INIT_TCACHE ();
+3043
+3044   DIAG_PUSH_NEEDS_COMMENT;
+3045   if (tc_idx &lt; mp_.tcache_bins
+3046       /*&amp;&amp; tc_idx &lt; TCACHE_MAX_BINS*/ /* to appease gcc */
+3047       &amp;&amp; tcache
+3048       &amp;&amp; tcache-&gt;entries[tc_idx] != NULL)
+3049     {
+3050       return tcache_get (tc_idx);
+3051     }
+3052   DIAG_POP_NEEDS_COMMENT;
+3053 #endif
+3054
+3055   if (SINGLE_THREAD_P)
+3056     {
+3057       victim = _int_malloc (&amp;main_arena, bytes);
+3058       assert (!victim || chunk_is_mmapped (mem2chunk (victim)) ||
+3059         &amp;main_arena == arena_for_chunk (mem2chunk (victim)));
+3060       return victim;
+3061     }
+3062
+3063   arena_get (ar_ptr, bytes);
+3064
+3065   victim = _int_malloc (ar_ptr, bytes);
+3066   /* Retry with another arena only if we were able to find a usable arena
+3067      before.  */
+3068   if (!victim &amp;&amp; ar_ptr != NULL)
+3069     {
+3070       LIBC_PROBE (memory_malloc_retry, 1, bytes);
+3071       ar_ptr = arena_get_retry (ar_ptr, bytes);
+3072       victim = _int_malloc (ar_ptr, bytes);
+3073     }
+3074
+3075   if (ar_ptr != NULL)
+3076     __libc_lock_unlock (ar_ptr-&gt;mutex);
+3077
+3078   assert (!victim || chunk_is_mmapped (mem2chunk (victim)) ||
+3079           ar_ptr == arena_for_chunk (mem2chunk (victim)));
+3080   return victim;
+3081 }
+3082 libc_hidden_def (__libc_malloc)</pre><p>
+</p><p>　シングルスレッドの場合には以下のように _int_malloc() 関数を使い victim に代入したものを返します。</p><pre class="programlisting">3055   if (SINGLE_THREAD_P)
+3056     {
+3057       victim = _int_malloc (&amp;main_arena, bytes);
+3058       assert (!victim || chunk_is_mmapped (mem2chunk (victim)) ||
+3059         &amp;main_arena == arena_for_chunk (mem2chunk (victim)));
+3060       return victim;
+3061     }</pre><p>　またこの際には main_arena のアドレスをパラメーターとして _int_malloc() 関数に渡しています。</p><p>　マルチスレッドであれば以下のように適当なアリーナを arena_get() で見つけます。</p><pre class="programlisting">3063   arena_get (ar_ptr, bytes);
+3064
+3065   victim = _int_malloc (ar_ptr, bytes);
+3066   /* Retry with another arena only if we were able to find a usable arena
+3067      before.  */
+3068   if (!victim &amp;&amp; ar_ptr != NULL)
+3069     {
+3070       LIBC_PROBE (memory_malloc_retry, 1, bytes);
+3071       ar_ptr = arena_get_retry (ar_ptr, bytes);
+3072       victim = _int_malloc (ar_ptr, bytes);
+3073     }
+3074
+3075   if (ar_ptr != NULL)
+3076     __libc_lock_unlock (ar_ptr-&gt;mutex);
+3077
+3078   assert (!victim || chunk_is_mmapped (mem2chunk (victim)) ||
+3079           ar_ptr == arena_for_chunk (mem2chunk (victim)));
+3080   return victim;</pre><p>　基本的には _int_malloc() を使うのはシングルスレッドと一緒ですが、アリーナは main_arena とは限らないです。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch48.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch49s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

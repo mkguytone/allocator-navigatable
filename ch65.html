@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第65章 ブロック I/O ( bio )</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt05.html" title="パート V. Linux カーネルのメモリーとファイルシステム" /><link rel="prev" href="ch64.html" title="第64章 バッファー ( buffer_head )" /><link rel="next" href="ch66.html" title="第66章 ページのキャッシュ" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch64.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch66.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_ブロック_i_o_bio"></a>第65章 ブロック I/O ( bio )</h2></div></div></div><p>　bio はブロック I/O の略のはずです。</p><p>　まあ知らんですけど、名前の由来はそれ以外にないと思います。</p><p>　struct bio は struct bio_vec というリストからページにマッピングされます。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/blk_types.h
+140 /*
+141  * main unit of I/O for the block layer and lower layers (ie drivers and
+142  * stacking drivers)
+143  */
+144 struct bio {
+145   struct bio    *bi_next; /* request queue link */
+146   struct gendisk    *bi_disk;
+147   unsigned int    bi_opf;   /* bottom bits req flags,
+148              * top bits REQ_OP. Use
+149              * accessors.
+150              */
+151   unsigned short    bi_flags; /* status, etc and bvec pool number */
+152   unsigned short    bi_ioprio;
+153   unsigned short    bi_write_hint;
+154   blk_status_t    bi_status;
+155   u8      bi_partno;
+156
+157   /* Number of segments in this BIO after
+158    * physical address coalescing is performed.
+159    */
+160   unsigned int    bi_phys_segments;
+161
+162   /*
+163    * To keep track of the max segment size, we account for the
+164    * sizes of the first and last mergeable segments in this bio.
+165    */
+
+166   unsigned int    bi_seg_front_size;
+167   unsigned int    bi_seg_back_size;
+168
+169   struct bvec_iter  bi_iter;
+170
+171   atomic_t    __bi_remaining;
+172   bio_end_io_t    *bi_end_io;
+173
+174   void      *bi_private;
+175 #ifdef CONFIG_BLK_CGROUP
+176   /*
+177    * Optional ioc and css associated with this bio.  Put on bio
+178    * release.  Read comment on top of bio_associate_current().
+179    */
+180   struct io_context *bi_ioc;
+181   struct cgroup_subsys_state *bi_css;
+182 #ifdef CONFIG_BLK_DEV_THROTTLING_LOW
+183   void      *bi_cg_private;
+184   struct bio_issue  bi_issue;
+185 #endif
+186 #endif
+187   union {
+188 #if defined(CONFIG_BLK_DEV_INTEGRITY)
+189     struct bio_integrity_payload *bi_integrity; /* data integrity */
+190 #endif
+191   };
+192
+193   unsigned short    bi_vcnt;  /* how many bio_vec's */
+194
+195   /*
+196    * Everything starting with bi_max_vecs will be preserved by bio_reset()
+197    */
+198
+199   unsigned short    bi_max_vecs;  /* max bvl_vecs we can hold */
+200
+201   atomic_t    __bi_cnt; /* pin count */
+202
+203   struct bio_vec    *bi_io_vec; /* the actual vec list */
+204
+205   struct bio_set    *bi_pool;
+206
+207   /*
+208    * We can inline a number of vecs at the end of the bio, to avoid
+209    * double allocations for a small number of bio_vecs. This member
+210    * MUST obviously be kept at the very end of the bio.
+211    */
+212   struct bio_vec    bi_inline_vecs[0];
+213 };</pre><p>　図を見ながら説明したほうが早いので図を見てください。</p><div class="informalfigure"><div class="mediaobject"><img src="img/bio.png" alt="img/bio.png" /></div></div><p>　ざっくり説明するとブロックとページがマップされているということです。</p><p>　さらに struct bio の他に struct bio_vec という構造体のリスト、イテレーターオブジェクトである struct bvec_iter がありますね。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+struct bvec_iter
+</span></dt><dd>
+bio_vec のイテレーター
+</dd><dt><span class="term">
+struct bio_vec
+</span></dt><dd>
+ページにマップされるブロックオブジェクト
+</dd></dl></div><p>　では宣言・定義を見てくださいね。</p><pre class="programlisting">// /usr/src/linux-headers-4.18.16-041816-generic/include/linux/bvec.h
+ 30 struct bio_vec {
+ 31   struct page *bv_page;
+ 32   unsigned int  bv_len;
+ 33   unsigned int  bv_offset;
+ 34 };
+ 35
+ 36 struct bvec_iter {
+ 37   sector_t    bi_sector;  /* device address in 512 byte
+ 38                sectors */
+ 39   unsigned int    bi_size;  /* residual I/O count */
+ 40
+ 41   unsigned int    bi_idx;   /* current index into bvl_vec */
+ 42
+ 43   unsigned int            bi_done;  /* number of bytes completed */
+ 44
+ 45   unsigned int            bi_bvec_done; /* number of bytes completed in
+ 46                current bvec */
+ 47 };</pre><p>　ブロック I/O は bio_vec の bv_page でページとリンクし bvec_iter の bi_idx がイテレーター・添字として機能するような感じですかね。</p><p>　まあ詳しくは bvec.h のソースを見てください。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch64.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt05.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch66.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

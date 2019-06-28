@@ -1,0 +1,680 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>96.1. 複数のアロケーターインスタンスを切り替え</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch96.html" title="第96章 アロケータークラス内での複数の割り当て方針を切り替え" /><link rel="prev" href="ch96.html" title="第96章 アロケータークラス内での複数の割り当て方針を切り替え" /><link rel="next" href="pt12.html" title="パート XII. C++ カスタムアロケーターの STL サポート（実験）" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch96.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt12.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_複数のアロケーターインスタンスを切り替え"></a>96.1. 複数のアロケーターインスタンスを切り替え</h2></div></div></div><p>一般的にオブジェクト指向プログラミングにおいて、機能やデータはクラスで分けた方が後々、変更が楽りますし再利用性もが上がります。</p><p>複数のアロケーターインスタンスを作ったほうが、長期的にはメンテがしやすいってことです。</p><p>では前の例を少し変更して考えて見ましょう。</p><p>まずスタックアロケーターを作るという意味ですと、メモリープールは 1 次元で十分となります。</p><p>それとストレージ用の配列も 1 個あれば十分です。</p><p>すると以下のような allocator クラスに変更することができます。</p><pre class="programlisting"> 12 template&lt;std::size_t N&gt;
+ 13 class allocator
+ 14 {
+ 15 public:
+ 16   typedef std::size_t size_type;
+ 17
+ 18   explicit inline allocator()
+ 19     :
+ 20     M_block_size_(sizeof(std::byte[N])),
+ 21     M_max_objects_(MAX_OBJECTS),
+ 22     M_head_(nullptr),
+ 23     M_pool_index_(0)
+ 24   {
+ 25     Mp_pool_ = new (&amp;Mp_Mem_) std::byte[sizeof(std::byte[N])*MAX_OBJECTS];
+ 26   }
+
+ // 中略
+
+ 57
+ 58 private:
+
+ // 中略
+
+ 82   std::byte* Mp_pool_;
+ 83   unsigned M_pool_index_; //新規割当時にインクリメント、下がることはない
+ 84   std::byte Mp_Mem_[sizeof(std::byte[N])*MAX_OBJECTS];
+ 85 };</pre><p>Mp_pool_ は配列ではないですし Mp_mem_ も一つ分しかないですね。</p><p>後はテンプレート引数 N が Mp_mem_ の記憶域のサイズを定義しています。</p><p>次にマネージャークラス block_allocator です。</p><pre class="programlisting"> 89 template&lt;typename T&gt;
+ 90 class block_allocator
+ 91 {
+
+// 中略
+
+169 private:
+170   static allocator<a id="CO1-1"></a>(1) S_alloc8_;
+171   static allocator<a id="CO1-2"></a>(2) S_alloc16_;
+172   static allocator<a id="CO1-3"></a>(3) S_alloc32_;
+173   static allocator<a id="CO1-4"></a>(4) S_alloc64_;
+174 };
+175
+176 template&lt;typename T&gt;
+177 allocator<a id="CO1-5"></a>(5)  block_allocator&lt;T&gt;::S_alloc8_;
+178
+179 template&lt;typename T&gt;
+180 allocator<a id="CO1-6"></a>(6) block_allocator&lt;T&gt;::S_alloc16_;
+181
+182 template&lt;typename T&gt;
+183 allocator<a id="CO1-7"></a>(7) block_allocator&lt;T&gt;::S_alloc32_;
+184
+185 template&lt;typename T&gt;
+186 allocator<a id="CO1-8"></a>(8) block_allocator&lt;T&gt;::S_alloc64_;</pre><p>このようにマネージャークラスにはアロケータークラス 4 個分のスタティックインスタンスを宣言・定義しておきます。</p><p>S_alloc8_ が 8 バイト均等ブロックの割り当て、S_alloc16_ が 16 バイト均等ブロックの割り当て、 S_alloc32_ が 32 バイト均等のブロックの割り当てを行います。</p><p>注意したいのは block_allocator&lt;T&gt; で（テンプレート引数の違う）インスタンスが 1 個増えるたびに 4 個分のアロケーターインスタンスが作られることですかね。</p><p>まあアロケーターのインスタンスはサイズからすりゃ大したことないんですけど。</p><p>ではフルソースで実装と検証をしてみましょう。</p><p><strong>main.cpp. </strong>
+</p><pre class="programlisting">  1 #include &lt;cstddef&gt;
+  2 #include &lt;memory&gt;
+  3 #include &lt;cassert&gt;
+  4 #include &lt;cstdlib&gt;
+  5 #include &lt;iostream&gt;
+  6 #include &lt;list&gt;
+  7 #include &lt;vector&gt;
+  8
+  9 #define MAX_OBJECTS 32
+ 10 #define MAX_ALLOCS 4
+ 11
+ 12 template&lt;std::size_t N&gt;
+ 13 class allocator
+ 14 {
+ 15 public:
+ 16   typedef std::size_t size_type;
+ 17
+ 18   explicit inline allocator()
+ 19     :
+ 20     M_block_size_(sizeof(std::byte[N])),
+ 21     M_max_objects_(MAX_OBJECTS),
+ 22     M_head_(nullptr),
+ 23     M_pool_index_(0)
+ 24   {
+ 25     Mp_pool_ = new (&amp;Mp_Mem_) std::byte[sizeof(std::byte[N])*MAX_OBJECTS];
+ 26   }
+ 27
+ 28   inline ~allocator(){
+ 29   }
+ 30
+ 31   inline void* allocate(){
+ 32     void* pblock = pop_from_pool();
+ 33     if(!pblock)
+ 34     {
+ 35       if(M_pool_index_ &lt; M_max_objects_)
+ 36       {
+ 37         ++M_pool_index_;
+ 38         pblock = static_cast&lt;void*&gt;(Mp_pool_ + (M_pool_index_ * M_block_size_));
+ 39         std::cout &lt;&lt; M_block_size_ &lt;&lt; ": M_pool_index=" &lt;&lt; M_pool_index_  &lt;&lt; " pblock=" &lt;&lt; pblock &lt;&lt; '\n';
+ 40       } else {
+ 41         std::cout &lt;&lt; "M_pool_index = " &lt;&lt; M_pool_index_ &lt;&lt; '\n';
+ 42         assert(false);
+ 43       }
+ 44     }
+ 45     return pblock;
+ 46   }
+ 47
+ 48   inline void deallocate(void* memory)
+ 49   {
+ 50     std::cout &lt;&lt; "rewind allocated address: " &lt;&lt; memory &lt;&lt; '\n';
+ 51     rewind(memory);
+ 52   }
+ 53
+ 54   inline size_t get_block_size() const {
+ 55     return M_block_size_;
+ 56   }
+ 57
+ 58 private:
+ 59   // 開放(deallocate)時に使用可能領域を更新
+ 60   inline void rewind(void* memory){
+ 61     block_not_in_use* pblock = static_cast&lt;block_not_in_use*&gt;(memory);
+ 62     pblock-&gt;next = M_head_; //先頭ポインタを新規ポインタの next ポインタに設定
+ 63     M_head_ = pblock; //新たなブロックを先頭ポインタに設定
+ 64   }
+ 65   // 割当(allocate)時に開放された使用可能領域から使う
+ 66   inline void* pop_from_pool(){
+ 67     block_not_in_use* pblock = nullptr;
+ 68     if(M_head_)
+ 69     {
+ 70       pblock = M_head_;
+ 71       M_head_ = M_head_-&gt;next;
+ 72     }
+ 73     return static_cast&lt;void*&gt;(pblock);
+ 74   }
+ 75   // 使用可能なメモリータグ（一度割当、後に開放された領域）
+ 76   struct block_not_in_use {
+ 77     block_not_in_use *next;
+ 78   };
+ 79   const size_t M_block_size_;
+ 80   const unsigned M_max_objects_;
+ 81   block_not_in_use* M_head_;
+ 82   std::byte* Mp_pool_;
+ 83   unsigned M_pool_index_; //新規割当時にインクリメント、下がることはない
+ 84   std::byte Mp_Mem_[sizeof(std::byte[N])*MAX_OBJECTS];
+ 85 };
+ 86
+ 87 /* スタックメモリーのブロックを割り当てるクラステンプレート */
+ 88
+ 89 template&lt;typename T&gt;
+ 90 class block_allocator
+ 91 {
+ 92 public:
+ 93   typedef T value_type;
+ 94   typedef value_type* pointer;
+ 95   typedef const value_type* const_pointer;
+ 96   typedef value_type&amp; reference;
+ 97   typedef const value_type&amp; const_reference;
+ 98   typedef std::size_t size_type;
+ 99   typedef std::ptrdiff_t difference_type;
+100
+101   template&lt;typename U&gt;
+102   struct rebind
+103   {
+104     typedef block_allocator&lt;U&gt; other;
+105   };
+106
+107   inline block_allocator() noexcept
+108   {}
+109   inline ~block_allocator() {}
+110
+111   inline explicit block_allocator(const block_allocator&amp;) noexcept {}
+112
+113   template&lt;typename U&gt;
+114   inline constexpr block_allocator(const block_allocator&lt;U&gt;&amp;) noexcept
+115   {}
+116
+117   inline pointer allocate(size_type n, typename std::allocator&lt;T&gt;::const_pointer = 0)
+118   {
+119     auto s = sizeof(T) * n;
+120     if(s &lt;= 8)
+121       return reinterpret_cast&lt;T*&gt;(S_alloc8_.allocate());
+122     else if(s &lt;= 16)
+123       return reinterpret_cast&lt;T*&gt;(S_alloc16_.allocate());
+124     else if(s &lt;= 32)
+125       return reinterpret_cast&lt;T*&gt;(S_alloc32_.allocate());
+126     else if(s &lt;= 64)
+127       return reinterpret_cast&lt;T*&gt;(S_alloc64_.allocate());
+128     else
+129       assert(false);
+130   }
+131
+132   inline void deallocate(T* p, size_type n) noexcept
+133   {
+134     auto s = sizeof(T) * n;
+135     if(s &lt;= 8)
+136       S_alloc8_.deallocate(reinterpret_cast&lt;void*&gt;(p));
+137     else if(s &lt;= 16)
+138       S_alloc16_.deallocate(reinterpret_cast&lt;void*&gt;(p));
+139     else if(s &lt;= 32)
+140       S_alloc32_.deallocate(reinterpret_cast&lt;void*&gt;(p));
+141     else if(s &lt;= 64)
+142       S_alloc64_.deallocate(reinterpret_cast&lt;void*&gt;(p));
+143     else
+144       assert(false);
+145   }
+146
+147   inline size_type max_size() const
+148   {
+149     return std::numeric_limits&lt;size_type&gt;::max();
+150   }
+151
+152   static size_type capacity()
+153   {
+154     return MAX_OBJECTS;
+155   }
+156
+157   template&lt;typename U, typename ... Args&gt;
+158   void construct(U* p, Args&amp;&amp;... args) {
+159     ::new ((void*)p) T(args...);
+160   }
+161
+162   template&lt;typename U&gt;
+163   void destroy(U* p)
+164   {
+165     std::cout &lt;&lt; "destroy: " &lt;&lt; p &lt;&lt; '\n';
+166     p-&gt;~U();
+167   }
+168
+169 private:
+170   static allocator<a id="CO1-9"></a>(1) S_alloc8_;
+171   static allocator<a id="CO1-10"></a>(2) S_alloc16_;
+172   static allocator<a id="CO1-11"></a>(3) S_alloc32_;
+173   static allocator<a id="CO1-12"></a>(4) S_alloc64_;
+174 };
+175
+176 template&lt;typename T&gt;
+177 allocator<a id="CO1-13"></a>(5)  block_allocator&lt;T&gt;::S_alloc8_;
+178
+179 template&lt;typename T&gt;
+180 allocator<a id="CO1-14"></a>(6) block_allocator&lt;T&gt;::S_alloc16_;
+181
+182 template&lt;typename T&gt;
+183 allocator<a id="CO1-15"></a>(7) block_allocator&lt;T&gt;::S_alloc32_;
+184
+185 template&lt;typename T&gt;
+186 allocator<a id="CO1-16"></a>(8) block_allocator&lt;T&gt;::S_alloc64_;
+187
+188 /* voidパラメーターのエラーチェックのためにvoid型のクラステンプレートを用意 */
+189
+190 template &lt;&gt;
+191 class block_allocator&lt;void&gt;
+192 {
+193 public:
+194   typedef void* pointer;
+195   typedef const void* const_pointer;
+196   typedef void value_type;
+197
+198   template&lt;typename U&gt;
+199   struct rebind
+200   {
+201     typedef block_allocator&lt;U&gt; other;
+202   };
+203
+204   explicit block_allocator() noexcept {
+205   }
+206
+207   template&lt;typename U&gt;
+208   block_allocator(const block_allocator&lt;U&gt;&amp;){}
+209
+210   template&lt;typename U&gt;
+211   block_allocator(std::allocator&lt;U&gt;&amp;){}
+212
+213 };
+214
+215 template&lt;typename T&gt;
+216 using rebind_t = typename block_allocator&lt;T&gt;::template rebind&lt;T&gt;::type;
+217
+218 template&lt;typename T, typename T2&gt;
+219 inline bool operator==(block_allocator&lt;T&gt; const&amp;, block_allocator&lt;T2&gt; const&amp;)
+220 {
+221   return true;
+222 }
+223
+224 template&lt;typename T, typename OtherAllocator&gt;
+225 inline bool operator==(block_allocator&lt;T&gt; const&amp;, OtherAllocator const&amp;)
+226 {
+227   return false;
+228 }
+229
+230 /* カスタムアロケータ― */
+231
+232 template&lt;typename Allocator, typename U&gt;
+233 struct block_rebind
+234 {
+235   typedef typename Allocator::template rebind&lt;U&gt;::other type;
+236 };
+237
+238 /* カスタムアロケータ―型のエイリアス */
+239
+240 template&lt;typename Allocator, typename U&gt;
+241 using block_rebind_t = typename block_rebind&lt;Allocator,U&gt;::type;
+242
+243 /* std::unique_ptr の引数に使う deleter */
+244
+245 template&lt;typename Allocator, typename T&gt;
+246 class block_delete
+247 {
+248 public:
+249   explicit block_delete(const Allocator&amp; alloc) noexcept
+250     : M_alloc_(alloc)
+251   {
+252   }
+253   template&lt;typename Other,typename U&gt;
+254   block_delete(const block_delete&lt;Other,U&gt;&amp; d) noexcept
+255     : M_alloc_(d.M_alloc_)
+256   {}
+257   void operator()(T* p) const
+258   {
+259     p-&gt;~T();
+260     M_alloc_.deallocate(p,1);
+261   }
+262 private:
+263   mutable block_rebind_t&lt;Allocator,T&gt; M_alloc_;
+264 };
+265
+266 /* カスタムアロケータ―で割り当てるスマートポインターの型 */
+267
+268 template&lt;typename Allocator, typename T&gt;
+269 using block_ptr = std::unique_ptr&lt;T,block_delete&lt;Allocator,T&gt;&gt;;
+270
+271 /* 割当関数 */
+272
+273 template&lt;typename T, typename Allocator, typename... Args&gt;
+274 block_ptr&lt;Allocator,T&gt; allocate_block(const Allocator&amp; alloc, Args&amp;&amp;... args)
+275 {
+276   block_rebind_t&lt;Allocator,T&gt; rebound_alloc(alloc);
+277   T* praw = rebound_alloc.allocate(1);
+278   try {
+279     T* p = new (praw) T(std::forward&lt;Args&gt;(args)...);
+280     return block_ptr&lt;Allocator,T&gt;(p,block_delete&lt;Allocator,T&gt;(rebound_alloc));
+281   } catch (...) {
+282     rebound_alloc.deallocate(praw,1);
+283   }
+284 }
+285
+286 struct A{
+287   A(int x, int y, int z, int a) :
+288     x_(x),
+289     y_(y),
+290     z_(z),
+291     a_(a)
+292   {}
+293   int x_,y_,z_,a_;
+294
+295 };
+296
+297 int main()
+298 {
+299   using int_allocator = block_allocator&lt;int&gt;;
+300   using a_allocator = block_allocator&lt;A&gt;;
+301
+302   int_allocator alloc;
+303   int_allocator alloc_copy;
+304   a_allocator alloc_a;
+305
+306   for(int i = 0; i &lt; 2; ++i) {
+307     auto l = allocate_block&lt;int,int_allocator&gt;(alloc,200);
+308     // alloc_copy は alloc と同じ allocator を共有しています
+309     auto a = allocate_block&lt;int,int_allocator&gt;(alloc_copy,600);
+310     {
+311       auto f = allocate_block&lt;A,a_allocator&gt;(alloc_a,1,2,3,4);
+312       auto g = allocate_block&lt;A,a_allocator&gt;(alloc_a,5,6,7,8);
+313     }
+314     auto v = allocate_block&lt;A,a_allocator&gt;(alloc_a,5,6,7,8);
+315     auto w = allocate_block&lt;A,a_allocator&gt;(alloc_a,15,16,17,18);
+316   }
+317
+318   return 0;
+319 }</pre><p>
+</p><p><strong>ビルドと実行結果. </strong>
+</p><pre class="programlisting">$ g++ selector.cpp -std=c++17
+$ ./a.out
+8: M_pool_index=1 pblock=0x555a4579816c
+8: M_pool_index=2 pblock=0x555a45798174
+16: M_pool_index=1 pblock=0x555a457992b4
+16: M_pool_index=2 pblock=0x555a457992c4
+rewind allocated address: 0x555a457992c4
+rewind allocated address: 0x555a457992b4
+rewind allocated address: 0x555a457992c4
+rewind allocated address: 0x555a457992b4
+rewind allocated address: 0x555a45798174
+rewind allocated address: 0x555a4579816c
+rewind allocated address: 0x555a457992c4
+rewind allocated address: 0x555a457992b4
+rewind allocated address: 0x555a457992c4
+rewind allocated address: 0x555a457992b4
+rewind allocated address: 0x555a45798174
+rewind allocated address: 0x555a4579816c</pre><p>
+</p><p>このセレクターはフリーリストを回避するための実装方法としての意味もあります。</p><p>まずは block_allocator クラステンプレートを見てみましょう。</p><pre class="programlisting"> 87 /* スタックメモリーのブロックを割り当てるクラステンプレート */
+ 88
+ 89 template&lt;typename T&gt;
+ 90 class block_allocator
+ 91 {
+ 92 public:
+ 93   typedef T value_type;
+ 94   typedef value_type* pointer;
+ 95   typedef const value_type* const_pointer;
+ 96   typedef value_type&amp; reference;
+ 97   typedef const value_type&amp; const_reference;
+ 98   typedef std::size_t size_type;
+ 99   typedef std::ptrdiff_t difference_type;
+100
+101   template&lt;typename U&gt;
+102   struct rebind
+103   {
+104     typedef block_allocator&lt;U&gt; other;
+105   };
+106
+107   inline block_allocator() noexcept
+108   {}
+109   inline ~block_allocator() {}
+110
+111   inline explicit block_allocator(const block_allocator&amp;) noexcept {}
+112
+113   template&lt;typename U&gt;
+114   inline constexpr block_allocator(const block_allocator&lt;U&gt;&amp;) noexcept
+115   {}
+116
+117   inline pointer allocate(size_type n, typename std::allocator&lt;T&gt;::const_pointer = 0)
+118   {
+119     auto s = sizeof(T) * n;
+120     if(s &lt;= 8)
+121       return reinterpret_cast&lt;T*&gt;(S_alloc8_.allocate());
+122     else if(s &lt;= 16)
+123       return reinterpret_cast&lt;T*&gt;(S_alloc16_.allocate());
+124     else if(s &lt;= 32)
+125       return reinterpret_cast&lt;T*&gt;(S_alloc32_.allocate());
+126     else if(s &lt;= 64)
+127       return reinterpret_cast&lt;T*&gt;(S_alloc64_.allocate());
+128     else
+129       assert(false);
+130   }
+131
+132   inline void deallocate(T* p, size_type n) noexcept
+133   {
+134     auto s = sizeof(T) * n;
+135     if(s &lt;= 8)
+136       S_alloc8_.deallocate(reinterpret_cast&lt;void*&gt;(p));
+137     else if(s &lt;= 16)
+138       S_alloc16_.deallocate(reinterpret_cast&lt;void*&gt;(p));
+139     else if(s &lt;= 32)
+140       S_alloc32_.deallocate(reinterpret_cast&lt;void*&gt;(p));
+141     else if(s &lt;= 64)
+142       S_alloc64_.deallocate(reinterpret_cast&lt;void*&gt;(p));
+143     else
+144       assert(false);
+145   }
+146
+147   inline size_type max_size() const
+148   {
+149     return std::numeric_limits&lt;size_type&gt;::max();
+150   }
+151
+152   static size_type capacity()
+153   {
+154     return MAX_OBJECTS;
+155   }
+156
+157   template&lt;typename U, typename ... Args&gt;
+158   void construct(U* p, Args&amp;&amp;... args) {
+159     ::new ((void*)p) T(args...);
+160   }
+161
+162   template&lt;typename U&gt;
+163   void destroy(U* p)
+164   {
+165     std::cout &lt;&lt; "destroy: " &lt;&lt; p &lt;&lt; '\n';
+166     p-&gt;~U();
+167   }
+168
+169 private:
+170   static allocator<a id="CO1-17"></a>(1) S_alloc8_;
+171   static allocator<a id="CO1-18"></a>(2) S_alloc16_;
+172   static allocator<a id="CO1-19"></a>(3) S_alloc32_;
+173   static allocator<a id="CO1-20"></a>(4) S_alloc64_;
+174 };
+175
+176 template&lt;typename T&gt;
+177 allocator<a id="CO1-21"></a>(5)  block_allocator&lt;T&gt;::S_alloc8_;
+178
+179 template&lt;typename T&gt;
+180 allocator<a id="CO1-22"></a>(6) block_allocator&lt;T&gt;::S_alloc16_;
+181
+182 template&lt;typename T&gt;
+183 allocator<a id="CO1-23"></a>(7) block_allocator&lt;T&gt;::S_alloc32_;
+184
+185 template&lt;typename T&gt;
+186 allocator<a id="CO1-24"></a>(8) block_allocator&lt;T&gt;::S_alloc64_;</pre><p>まあこれだけで巨大なんですが重要な箇所は allocate() 関数だけです。</p><pre class="programlisting">117   inline pointer allocate(size_type n, typename std::allocator&lt;T&gt;::const_pointer = 0)
+118   {
+119     auto s = sizeof(T) * n;
+120     if(s &lt;= 8)
+121       return reinterpret_cast&lt;T*&gt;(S_alloc8_.allocate());
+122     else if(s &lt;= 16)
+123       return reinterpret_cast&lt;T*&gt;(S_alloc16_.allocate());
+124     else if(s &lt;= 32)
+125       return reinterpret_cast&lt;T*&gt;(S_alloc32_.allocate());
+126     else if(s &lt;= 64)
+127       return reinterpret_cast&lt;T*&gt;(S_alloc64_.allocate());
+128     else
+129       assert(false);
+130   }</pre><p>sizeof(T) * n のサイズを一つのブロックサイズとして、各ブロックサイズのアロケーターへのセレクター機能を allocate() 関数が担当しています。</p><p>例えば 8 バイトブロックの 3 個分がリクエストされたら、リクエストサイズは 16 バイトと 32 バイトの間なので S_alloc32_ の allocate() をコールします。</p><p>16 バイトブロック 2 個分のリクエストサイズは 32 バイトになるので、 S_alloc32_ の allocate() をコールします。</p><p>16 バイトブロック 3 個分のリクエストサイズは 48 バイトになるので、 S_alloc64_ の allocate() が呼ばれます。</p><p>まあこんな感じで block_allocator の allocate() 関数が固定サイズアロケーターをセレクトしていきます。</p><p>この実装の利点は allocator クラステンプレート側に型名パラメーター T が存在しないことです。</p><pre class="programlisting">  9 #define MAX_OBJECTS 32
+ 10 #define MAX_ALLOCS 4
+ 11
+ 12 template&lt;std::size_t N&gt;
+ 13 class allocator
+ 14 {
+ 15 public:
+ 16   typedef std::size_t size_type;
+ 17
+ 18   explicit inline allocator()
+ 19     :
+ 20     M_block_size_(sizeof(std::byte[N])),
+ 21     M_max_objects_(MAX_OBJECTS),
+ 22     M_head_(nullptr),
+ 23     M_pool_index_(0)
+ 24   {
+ 25     Mp_pool_ = new (&amp;Mp_Mem_) std::byte[sizeof(std::byte[N])*MAX_OBJECTS];
+ 26   }</pre><p>つまり allocator はブロックサイズとリクエストサイズが等しいという前提で設計ができるので、リクエストサイズとフリーチャンクの情報のメンテナンスは不要になります。</p><pre class="programlisting"> 28   inline ~allocator(){
+ 29   }
+ 30
+ 31   inline void* allocate(){
+ 32     void* pblock = pop_from_pool();
+ 33     if(!pblock)
+ 34     {
+ 35       if(M_pool_index_ &lt; M_max_objects_)
+ 36       {
+ 37         ++M_pool_index_;
+ 38         pblock = static_cast&lt;void*&gt;(Mp_pool_ + (M_pool_index_ * M_block_size_));
+ 39         std::cout &lt;&lt; M_block_size_ &lt;&lt; ": M_pool_index=" &lt;&lt; M_pool_index_  &lt;&lt; " pblock=" &lt;&lt; pblock &lt;&lt; '\n';
+ 40       } else {
+ 41         std::cout &lt;&lt; "M_pool_index = " &lt;&lt; M_pool_index_ &lt;&lt; '\n';
+ 42         assert(false);
+ 43       }
+ 44     }
+ 45     return pblock;
+ 46   }
+ 47
+ 48   inline void deallocate(void* memory)
+ 49   {
+ 50     std::cout &lt;&lt; "rewind allocated address: " &lt;&lt; memory &lt;&lt; '\n';
+ 51     rewind(memory);
+ 52   }</pre><p>このようにスタックアロケーターのロジックをかなり省略できたことにお気づきになれますかね？</p><p>もちろん呼び出し関数もよりシンプルになってます。</p><pre class="programlisting"> 59   // 開放(deallocate)時に使用可能領域を更新
+ 60   inline void rewind(void* memory){
+ 61     block_not_in_use* pblock = static_cast&lt;block_not_in_use*&gt;(memory);
+ 62     pblock-&gt;next = M_head_; //先頭ポインタを新規ポインタの next ポインタに設定
+ 63     M_head_ = pblock; //新たなブロックを先頭ポインタに設定
+ 64   }
+ 65   // 割当(allocate)時に開放された使用可能領域から使う
+ 66   inline void* pop_from_pool(){
+ 67     block_not_in_use* pblock = nullptr;
+ 68     if(M_head_)
+ 69     {
+ 70       pblock = M_head_;
+ 71       M_head_ = M_head_-&gt;next;
+ 72     }
+ 73     return static_cast&lt;void*&gt;(pblock);
+ 74   }
+ 75   // 使用可能なメモリータグ（一度割当、後に開放された領域）
+ 76   struct block_not_in_use {
+ 77     block_not_in_use *next;
+ 78   };</pre><p>rewind() は単にフリー（チャンク）リストの先頭を解放したフリーチャンクに設定し、前の先頭は next ポインターに設定されます。</p><p>pop_from_pool() も先頭からフリーチャンクを取り出して返すだけですね。</p><p>一旦説明を block_allocator クラステンプレートに戻したいと思います。</p><pre class="programlisting">170   static allocator<a id="CO1-25"></a>(1) S_alloc8_;
+171   static allocator<a id="CO1-26"></a>(2) S_alloc16_;
+172   static allocator<a id="CO1-27"></a>(3) S_alloc32_;
+173   static allocator<a id="CO1-28"></a>(4) S_alloc64_;
+174 };
+175
+176 template&lt;typename T&gt;
+177 allocator<a id="CO1-29"></a>(5)  block_allocator&lt;T&gt;::S_alloc8_;
+178
+179 template&lt;typename T&gt;
+180 allocator<a id="CO1-30"></a>(6) block_allocator&lt;T&gt;::S_alloc16_;
+181
+182 template&lt;typename T&gt;
+183 allocator<a id="CO1-31"></a>(7) block_allocator&lt;T&gt;::S_alloc32_;
+184
+185 template&lt;typename T&gt;
+186 allocator<a id="CO1-32"></a>(8) block_allocator&lt;T&gt;::S_alloc64_;</pre><p>このケースだとアロケーターは 4 個しかないですが、スタティックインスタンスをいくつも用意しておくのであれば 20 - 30 個分ぐらいあっても大丈夫です。</p><p>これスタックだから心配（ガクブル）とお考えになるかもしれないですが、大丈夫ですよ。</p><p>スタティックインスタンスが割り当てられるのはスタック領域じゃなくヒープ領域に割り当てられる（実装依存）という前提で考えれば良いと思います。</p><p>そもそもメモリーが足りないというよりフラグメンテーションが怖いケースの方が多いので、多少メモリー容量を無駄にしてでも実装する価値はあります。</p><p>テストコードについては、スマートポインター化するための allocate_block 関数テンプレートを使います。</p><pre class="programlisting">230 /* カスタムアロケータ― */
+231
+232 template&lt;typename Allocator, typename U&gt;
+233 struct block_rebind
+234 {
+235   typedef typename Allocator::template rebind&lt;U&gt;::other type;
+236 };
+237
+238 /* カスタムアロケータ―型のエイリアス */
+239
+240 template&lt;typename Allocator, typename U&gt;
+241 using block_rebind_t = typename block_rebind&lt;Allocator,U&gt;::type;
+242
+243 /* std::unique_ptr の引数に使う deleter */
+244
+245 template&lt;typename Allocator, typename T&gt;
+246 class block_delete
+247 {
+248 public:
+249   explicit block_delete(const Allocator&amp; alloc) noexcept
+250     : M_alloc_(alloc)
+251   {
+252   }
+253   template&lt;typename Other,typename U&gt;
+254   block_delete(const block_delete&lt;Other,U&gt;&amp; d) noexcept
+255     : M_alloc_(d.M_alloc_)
+256   {}
+257   void operator()(T* p) const
+258   {
+259     p-&gt;~T();
+260     M_alloc_.deallocate(p,1);
+261   }
+262 private:
+263   mutable block_rebind_t&lt;Allocator,T&gt; M_alloc_;
+264 };
+265
+266 /* カスタムアロケータ―で割り当てるスマートポインターの型 */
+267
+268 template&lt;typename Allocator, typename T&gt;
+269 using block_ptr = std::unique_ptr&lt;T,block_delete&lt;Allocator,T&gt;&gt;;
+270
+271 /* 割当関数 */
+272
+273 template&lt;typename T, typename Allocator, typename... Args&gt;
+274 block_ptr&lt;Allocator,T&gt; allocate_block(const Allocator&amp; alloc, Args&amp;&amp;... args)
+275 {
+276   block_rebind_t&lt;Allocator,T&gt; rebound_alloc(alloc);
+277   T* praw = rebound_alloc.allocate(1);
+278   try {
+279     T* p = new (praw) T(std::forward&lt;Args&gt;(args)...);
+280     return block_ptr&lt;Allocator,T&gt;(p,block_delete&lt;Allocator,T&gt;(rebound_alloc));
+281   } catch (...) {
+282     rebound_alloc.deallocate(praw,1);
+283   }
+284 }</pre><p>カスタムデリーターを実装して std::unique_ptr のインスタンスを作っているだけです。</p><p>ただリクエスト個数が 1 個に限定されているので、ここは引数を増やして対応するのもありっちゃありそうですが T 型のオブジェクトを複数個欲しいというのは STL コンテナが行う最適化なので STL コンテナを使わないのであれば、これで十分だと思います。</p><p>ではテストコードを見てみましょう。</p><pre class="programlisting">286 struct A{
+287   A(int x, int y, int z, int a) :
+288     x_(x),
+289     y_(y),
+290     z_(z),
+291     a_(a)
+292   {}
+293   int x_,y_,z_,a_;
+294
+295 };
+296
+297 int main()
+298 {
+299   using int_allocator = block_allocator&lt;int&gt;;
+300   using a_allocator = block_allocator&lt;A&gt;;
+301
+302   int_allocator alloc;
+303   int_allocator alloc_copy;
+304   a_allocator alloc_a;
+305
+306   for(int i = 0; i &lt; 2; ++i) {
+307     auto l = allocate_block&lt;int,int_allocator&gt;(alloc,200);
+308     // alloc_copy は alloc と同じ allocator を共有しています
+309     auto a = allocate_block&lt;int,int_allocator&gt;(alloc_copy,600);
+310     {
+311       auto f = allocate_block&lt;A,a_allocator&gt;(alloc_a,1,2,3,4);
+312       auto g = allocate_block&lt;A,a_allocator&gt;(alloc_a,5,6,7,8);
+313     }
+314     auto v = allocate_block&lt;A,a_allocator&gt;(alloc_a,5,6,7,8);
+315     auto w = allocate_block&lt;A,a_allocator&gt;(alloc_a,15,16,17,18);
+316   }
+317
+318   return 0;
+319 }</pre><p>2 回 int 型を生成し、4 回 A 型のオブジェクトを生成していますね。</p><p>さらに A 型オブジェクトについては 2 回はブロックの内部にあるので有効期限が瞬時に切れて解放されます。</p><p>ついでに int 型オブジェクトもループが終了するたびに解放されます。</p><p>そのため以下のように新規割り当ては 2 回だけで、その後は既に割り当てたアドレスを再利用していきます。</p><pre class="programlisting">8: M_pool_index=1 pblock=0x555a4579816c
+8: M_pool_index=2 pblock=0x555a45798174
+16: M_pool_index=1 pblock=0x555a457992b4
+16: M_pool_index=2 pblock=0x555a457992c4
+rewind allocated address: 0x555a457992c4
+rewind allocated address: 0x555a457992b4
+rewind allocated address: 0x555a457992c4
+rewind allocated address: 0x555a457992b4
+rewind allocated address: 0x555a45798174
+rewind allocated address: 0x555a4579816c
+rewind allocated address: 0x555a457992c4
+rewind allocated address: 0x555a457992b4
+rewind allocated address: 0x555a457992c4
+rewind allocated address: 0x555a457992b4
+rewind allocated address: 0x555a45798174
+rewind allocated address: 0x555a4579816c</pre><p>これでセレクターについての説明は終わりですが、実装面に慣れてきたら、最終的にはメモリーをどう使いたいのかという設計の問題にいきつくでしょうね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch96.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch96.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="pt12.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

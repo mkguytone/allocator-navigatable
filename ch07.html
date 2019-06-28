@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第7章 /dev ディレクトリー</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt01.html" title="パート I. Linux と POSIX C" /><link rel="prev" href="ch06.html" title="第6章 シェルの確認" /><link rel="next" href="ch07s01.html" title="7.1. echo のリダイレクト" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch06.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch07s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_dev_ディレクトリー"></a>第7章 /dev ディレクトリー</h2></div></div></div><p>　Linux や Unix 系の OS には /dev というディレクトリーが作られます。</p><p>　この /dev ディレクトリーは、デバイスを抽象化したファイルかのようにアクセスできるようになってます。</p><p>　ちなみに物理的なデバイスではない特殊なファイルもあります。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+/dev/null
+</span></dt><dd>
+このファイルに書き込まれたデータを全て捨てる
+</dd></dl></div><p>　これ以外にもターミナルにアクセスする端末（ターミナル）デバイスを抽象化した特殊ファイルもあります。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+/dev/tty
+</span></dt><dd>
+ログイン済みのシェルでは /dev/tty が現在使用中の端末（ターミナル）として機能
+</dd></dl></div><p>　まずは「 &gt; 」リダイレクトを使ってファイルを作ります。</p><pre class="programlisting">$ cat &gt; cat.in
+abcde
+fghijk</pre><p>　cat の後に手打ちで</p><p><strong>「Ctrl + d」. </strong>　の順序でキーボードを叩いてください。</p><p>　確認は cat コマンドです。</p><pre class="programlisting">$ cat cat.in
+abcde
+fghijk</pre><p>　こんな感じでリダイレクトが入力した文字列を cat.in ファイルへ記録したことが確認できます。</p><p>　もしくはキーボードによる入力でなく、他のコマンドの出力をファイルにリダイレクトします。</p><p>　例えばディレクトリー内のファイル名の一覧を出力してくれる ls コマンドを使うと良いでしょう。</p><pre class="programlisting">$ ls
+cat.in
+$ ls &gt; cat.ls
+$ ls
+cat.in  cat.ls
+$ cat cat.ls
+cat.in
+cat.ls</pre><p>　このようにファイルではなくコマンドからでもリダイレクトでデータをコピーすることができます。</p><p>　次にこれを端末（ターミナル）に相当する /dev/tty にリダイレクトとして、端末に表示されるかチェックしてみましょう。</p><pre class="programlisting">$ cat cat.in &gt; /dev/null
+$ cat cat.in &gt; /dev/tty
+abcde
+fghijk
+$ cat cat.ls &gt; /dev/tty
+cat.in
+cat.ls</pre><p>　このようにファイルの中身をリダイレクトしてログイン済みで使用中のターミナルに出力させることもできますね。</p><p>　もちろんこんな面倒をことをせずに標準入力のデバイスから直接打ち込むというのもありです。</p><pre class="programlisting">$ cat &gt; /dev/tty
+abc
+abc
+ddd
+ddd
+eee
+eee</pre><p>　ちなみに筆者は cat コマンドの実行後には以下のようにキーボードを叩いてます。</p><p><strong>Ctrl+d. </strong>　「ワイはシェルを学びたいんじゃないYO」とお考えの方もいらっしゃるでしょうがね。</p><p>　しかしとあるハッカーさんによるとまずは、開発するソフトウェアに似たツールに習熟してからコードすると良いよって言ってますんで、シェルを学ぶのは良いことです。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch06.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt01.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch07s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>

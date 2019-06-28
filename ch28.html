@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第28章 malloc() の内部実装</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="next" href="ch29.html" title="第29章 アリーナによるマルチスレッド対応" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="pt04.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch29.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_malloc_の内部実装"></a>第28章 malloc() の内部実装</h2></div></div></div><p>　malloc() はシングルスレッドだと単に brk() / sbrk() システムコールを実装したものと考えれば良いのですが、マルチスレッドにすると一気に複雑になります。</p><p>　それで malloc() の実装は大昔には dlmalloc() というのを使ってたらしいですが、最近は ptmalloc() というのが標準みたいです。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+dlmalloc （シングルスレッド）
+</li><li class="listitem">
+ptmalloc （マルチスレッド）
+</li></ul></div><p>　dlmalloc() / ptmalloc() もいずれも十分に複雑なんですが、dlmalloc() はスレッドを考えない分かなりシンプルな方に分類できますかね。</p><p>　それでこの項目では malloc() という時は ptmalloc() のことを言います。</p><p>　もちろん malloc() の中身を全て理解している人なんて、一部の猛者を除いて滅多にお目にかかれませんし、ptmalloc() となると尚更難しくなります。</p><p>　なので筆者が説明できる範囲も、筆者の理解が及び部分だけになります。</p><p>　まあ大したことないっすよ…</p><p>　(´・ω・｀)</p><p>　それと malloc にはいくつか基本使用みたいなものがあります。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+サポートするポインターサイズ
+</span></dt><dd>
+4 バイトまたは 8 バイト
+</dd><dt><span class="term">
+サポートする size_t
+</span></dt><dd>
+4 バイトまたは 8 バイト
+</dd><dt><span class="term">
+アラインメント
+</span></dt><dd>
+2 * sizeof(size_t)
+</dd><dt><span class="term">
+各割り当てチャンクに発生するオーバヘッド
+</span></dt><dd>
+4 バイトまたは 8 バイト
+</dd></dl></div><p>　それと 8 バイトのポインターの割り当てサイズは最低でも 24/32 バイトになります。</p><p>　最大だと 2^64 - 2 ページ（筆者の検証環境では 1 ページは4096）となります。</p><p>　詳細は malloc.c に記述されていますので、チェックしておいてくださいね。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre class="programlisting">  93   Supported pointer representation:       4 or 8 bytes
+  94   Supported size_t  representation:       4 or 8 bytes
+  95        Note that size_t is allowed to be 4 bytes even if pointers are 8.
+  96        You can adjust this by defining INTERNAL_SIZE_T
+  97
+  98   Alignment:                              2 * sizeof(size_t) (default)
+  99        (i.e., 8 byte alignment with 4byte size_t). This suffices for
+ 100        nearly all current machines and C compilers. However, you can
+ 101        define MALLOC_ALIGNMENT to be wider than this if necessary.
+ 102
+ 103   Minimum overhead per allocated chunk:   4 or 8 bytes
+ 104        Each malloced chunk has a hidden word of overhead holding size
+ 105        and status information.
+ 106
+ 107   Minimum allocated size: 4-byte ptrs:  16 bytes    (including 4 overhead)
+ 108         8-byte ptrs:  24/32 bytes (including, 4/8 overhead)
+//略
+ 126   Maximum allocated size:  4-byte size_t: 2^32 minus about two pages
+ 127          8-byte size_t: 2^64 minus about two pages
+//略
+ 146   Thread-safety: thread-safe</pre><p>
+</p><p>　アラインメント（Alignment）は 2 * sizeof(size_t) がデフォルト値になります。</p><p>　この値は MALLOC_ALIGNMENT の目安となります。</p><p>　筆者のうろ覚えだと 32 ビットアーキテクチャなら 8 バイト、64 ビットアーキテクチャなら 16 バイトになるでしょう。</p><p>　ああそれと malloc() はスレッドセーフなので、マルチスレッドで使っても特に何もしなくても大丈夫だともコメントには書いていますね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pt04.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch29.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
