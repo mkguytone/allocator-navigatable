@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第43章 Binmap のマクロ</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch42.html" title="第42章 トップチャンク（ Top Chunk ）のマクロ" /><link rel="next" href="ch44.html" title="第44章 tcache" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch42.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch44.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_binmap_のマクロ"></a>第43章 Binmap のマクロ</h2></div></div></div><p>　Binmap はビンが空か記録しているビットベクターです。</p><p>　具体的に語るなら struct malloc_state のメンバー binmap のことです。</p><pre class="programlisting">1698   /* Bitmap of bins */
-1699   unsigned int binmap[BINMAPSIZE];</pre><p>　この binmap[] 配列を使うことで、大量のビンの検索を効率化します。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
-</p><pre class="programlisting">1547 /*
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第43章 Binmap のマクロ</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch42.html" title="第42章 トップチャンク（ Top Chunk ）のマクロ" /><link rel="next" href="ch44.html" title="第44章 tcache" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch42.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch44.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_binmap_のマクロ"></a>第43章 Binmap のマクロ</h2></div></div></div><p>Binmap はビンが空か記録しているビットベクターです。</p><p>具体的に語るなら struct malloc_state のメンバー binmap のことです。</p><pre xmlns="" class="prettyprint">1698   /* Bitmap of bins */
+1699   unsigned int binmap[BINMAPSIZE];</pre><p>この binmap[] 配列を使うことで、大量のビンの検索を効率化します。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre xmlns="" class="prettyprint">1547 /*
 1548    Binmap
 1549
 1550     To help compensate for the large number of bins, a one-level index
@@ -23,7 +27,7 @@
 1566 #define mark_bin(m, i)    ((m)-&gt;binmap[idx2block (i)] |= idx2bit (i))
 1567 #define unmark_bin(m, i)  ((m)-&gt;binmap[idx2block (i)] &amp;= ~(idx2bit (i)))
 1568 #define get_binmap(m, i)  ((m)-&gt;binmap[idx2block (i)] &amp; idx2bit (i))</pre><p>
-</p><p>　一応ですが 1U は 1 の符号無し表現ですんで 1 と考えてもらって結構です。</p><p>　BITSREMAP マクロは 2 の 5 乗なので 32 に評価されます。</p><p>　NBINS は 128 なので BINNAPSIZE は 4 になります。</p><p>　つまりビンのインデックスは全て合わせて 128 個あるので、 binmap[4] に対して 32 ビットあるなら、32 ビットのビットベクターを 4 個のブロックに分割するというアイデアですね。</p><p>　idx2block(i) は i を 32 ビット表現のブロックインデックスにエンコードします。</p><p>　idx2bit(i) は i を 2 進数のビットベクターにエンコードします。</p><p>　後の処理はビットベクターにフラグを立てたり、クリアにしたり、ビットベクターからインデックスを抽出しています。</p><p>　まあこんなこと言われてもわからんでしょうから、一応検証してみましょう。</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+</p><p>一応ですが 1U は 1 の符号無し表現ですんで 1 と考えてもらって結構です。</p><p>BITSREMAP マクロは 2 の 5 乗なので 32 に評価されます。</p><p>NBINS は 128 なので BINNAPSIZE は 4 になります。</p><p>つまりビンのインデックスは全て合わせて 128 個あるので、 binmap[4] に対して 32 ビットあるなら、32 ビットのビットベクターを 4 個のブロックに分割するというアイデアですね。</p><p>idx2block(i) は i を 32 ビット表現のブロックインデックスにエンコードします。</p><p>idx2bit(i) は i を 2 進数のビットベクターにエンコードします。</p><p>後の処理はビットベクターにフラグを立てたり、クリアにしたり、ビットベクターからインデックスを抽出しています。</p><p>まあこんなこと言われてもわからんでしょうから、一応検証してみましょう。</p><pre xmlns="" class="prettyprint">  1 #include &lt;stdio.h&gt;
   2 #include &lt;stdlib.h&gt;
   3
   4 #define NBINS            128
@@ -65,8 +69,8 @@
  40     map = (&amp;av)-&gt;binmap[block];
  41     printf("%d : block %d : bit %d : map %u\n",i,block,bit,map);
  42   }
- 43 }</pre><p>　このソースコードは binmap[4] の配列を arena という便宜上作った構造体に定義しています。</p><p>　そして unmark_bin() マクロによって一旦、全てのビットを 0 初期化します。</p><p>　後は算出した block と bit と map を表示しているだけです。</p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ gcc main.c
+ 43 }</pre><p>このソースコードは binmap[4] の配列を arena という便宜上作った構造体に定義しています。</p><p>そして unmark_bin() マクロによって一旦、全てのビットを 0 初期化します。</p><p>後は算出した block と bit と map を表示しているだけです。</p><p><strong>ビルドと実行結果. </strong>
+</p><pre xmlns="" class="prettyprint">$ gcc main.c
 $ ./a.out
 4
 0 : block 0 : bit 1 : map 0
@@ -197,8 +201,8 @@ $ ./a.out
 125 : block 3 : bit 536870912 : map 0
 126 : block 3 : bit 1073741824 : map 0
 127 : block 3 : bit -2147483648 : map 0</pre><p>
-</p><p>　出力のうちで注目すべきは block です。</p><p>　block は [0,1,2,3] というようにビンインデックスを 4 個に分類できています。</p><p>　さらに bit は [1,2,4,8,16,32,64,128,256,512,…] というように 2 の冪乗の数列になっています。</p><p>　つまり各ビットがフラグとなる、 32 ビットのビットベクターとなっていますね。</p><p>　この例では全てのビットがリセットされた状態ですが、例えば一部のビットをセットしたらどうなるか検証して見ましょう。</p><p><strong>main.c. </strong>
-</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+</p><p>出力のうちで注目すべきは block です。</p><p>block は [0,1,2,3] というようにビンインデックスを 4 個に分類できています。</p><p>さらに bit は [1,2,4,8,16,32,64,128,256,512,…] というように 2 の冪乗の数列になっています。</p><p>つまり各ビットがフラグとなる、 32 ビットのビットベクターとなっていますね。</p><p>この例では全てのビットがリセットされた状態ですが、例えば一部のビットをセットしたらどうなるか検証して見ましょう。</p><p><strong>main.c. </strong>
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;stdio.h&gt;
   2
   3 #define NBINS            128
   4 #define BINMAPSHIFT      5
@@ -244,10 +248,10 @@ $ ./a.out
  44     printf("%d : block %d : bit %d : map %u\n",i,block,bit,map);
  45   }
  46 }</pre><p>
-</p><p>　前のコードと異なるのは以下の 3 行です。</p><pre class="programlisting"> 36   mark_bin(&amp;av,3);
+</p><p>前のコードと異なるのは以下の 3 行です。</p><pre xmlns="" class="prettyprint"> 36   mark_bin(&amp;av,3);
  37   mark_bin(&amp;av,33);
- 38   mark_bin(&amp;av,125);</pre><p>　36 行はブロック 0 の bit 8 を設定しています。</p><p>　37 行はブロック 1 の bit 2 を設定しています。</p><p>　38 行はブロック 3 の bit 536870912 を設定しています。</p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ gcc main.c
+ 38   mark_bin(&amp;av,125);</pre><p>36 行はブロック 0 の bit 8 を設定しています。</p><p>37 行はブロック 1 の bit 2 を設定しています。</p><p>38 行はブロック 3 の bit 536870912 を設定しています。</p><p><strong>ビルドと実行結果. </strong>
+</p><pre xmlns="" class="prettyprint">$ gcc main.c
 $ ./a.out
 4
 0 : block 0 : bit 1 : map 8
@@ -378,4 +382,4 @@ $ ./a.out
 125 : block 3 : bit 536870912 : map 536870912
 126 : block 3 : bit 1073741824 : map 536870912
 127 : block 3 : bit -2147483648 : map 536870912</pre><p>
-</p><p>　まずビットをセットしたことによって map の値が変化していますよね？</p><p>　もうひとつ特筆すべきはブロック 2 の map が 0 のままということです。</p><p>　この場合、ブロック内のビンが使われているかは map が 0 でないことで瞬時に判定できます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch42.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch44.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+</p><p>まずビットをセットしたことによって map の値が変化していますよね？</p><p>もうひとつ特筆すべきはブロック 2 の map が 0 のままということです。</p><p>この場合、ブロック内のビンが使われているかは map が 0 でないことで瞬時に判定できます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch42.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch44.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

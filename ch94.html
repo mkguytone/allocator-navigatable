@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第94章 static オブジェクトはヒープっぽい領域に割り当てられるはず？</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt10.html" title="パート X. ヒープ領域のアドレスに割り当て" /><link rel="prev" href="ch93.html" title="第93章 カスタムヒープアロケーター" /><link rel="next" href="ch95.html" title="第95章 アロケーターをスタティックメンバーにするとどうなるのか？" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch93.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch95.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_static_オブジェクトはヒープっぽい領域に割り当てられるはず"></a>第94章 static オブジェクトはヒープっぽい領域に割り当てられるはず？</h2></div></div></div><p>初期化時に大きめのアドレス空間（またはメモリープール）を予約しておいて、毎回割り当てする時間を省略するってのがプレースメント new の目的ですが、基本ルールはスタック領域に割り当てられちゃいます。</p><p>ですが、これを捻じ曲げる原則があります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第94章 static オブジェクトはヒープっぽい領域に割り当てられるはず？</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt10.html" title="パート X. ヒープ領域のアドレスに割り当て" /><link rel="prev" href="ch93.html" title="第93章 カスタムヒープアロケーター" /><link rel="next" href="ch95.html" title="第95章 アロケーターをスタティックメンバーにするとどうなるのか？" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch93.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch95.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_static_オブジェクトはヒープっぽい領域に割り当てられるはず"></a>第94章 static オブジェクトはヒープっぽい領域に割り当てられるはず？</h2></div></div></div><p>初期化時に大きめのアドレス空間（またはメモリープール）を予約しておいて、毎回割り当てする時間を省略するってのがプレースメント new の目的ですが、基本ルールはスタック領域に割り当てられちゃいます。</p><p>ですが、これを捻じ曲げる原則があります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 static で宣言したオブジェクトはヒープ領域に割り当てられる
 </li></ul></div><p>つまりデスネ…</p><p>static で宣言したらプログラム開始から終了までがオブジェクトの有効期間（またはライフタイム）になるわけです。</p><p>でもスタック領域に割り当てたらポップしたら消えちゃうので駄目っすよね？</p><p>static で宣言した配列はヒープ領域（もしくは mmap のメモリー領域）にないと駄目ってことです。</p><p>まあ規格ではこれが書かれてないはずなので、経験則なんですどね。</p><p>では軽く検証してみましょう。</p><p><strong>main.cpp. </strong>
-</p><pre class="programlisting">  1 #include &lt;cstddef&gt;
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;cstddef&gt;
   2 #include &lt;new&gt;
   3 #include &lt;cstddef&gt;
   4 #include &lt;cstdio&gt;
@@ -31,20 +35,20 @@ static で宣言したオブジェクトはヒープ領域に割り当てられ�
  27   return 0;
  28 }</pre><p>
 </p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp -std=c++17
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp -std=c++17
 $ ./a.out
 [0] 0x5582aba10040 : 15
 [1] 0x5582aba10041 : 10
 [0] 0x5582aba10040 : 15
 [1] 0x5582aba10041 : 10</pre><p>
-</p><p>それでスタティックオブジェクトの宣言・定義を見てみましょうかね。</p><pre class="programlisting">  8 struct A
+</p><p>それでスタティックオブジェクトの宣言・定義を見てみましょうかね。</p><pre xmlns="" class="prettyprint">  8 struct A
   9 {
  10   static std::byte M_data_[MAX_OBJS];
  11 };
  12
  13 std::byte A::M_data_[MAX_OBJS];
  14
- 15 static A a;</pre><p>A は何も実装されていないアロケーターだとすると M_data_ が記憶域ってことになります。</p><p>std::byte は 1 バイトなので M_data_ は MAX_OBJS バイトの記憶域になります。</p><pre class="programlisting">[0] 0x5582aba10040 : 15
+ 15 static A a;</pre><p>A は何も実装されていないアロケーターだとすると M_data_ が記憶域ってことになります。</p><p>std::byte は 1 バイトなので M_data_ は MAX_OBJS バイトの記憶域になります。</p><pre xmlns="" class="prettyprint">[0] 0x5582aba10040 : 15
 [1] 0x5582aba10041 : 10
 [0] 0x5582aba10040 : 15
-[1] 0x5582aba10041 : 10</pre><p>メモリーアドレスを見るとヒープっぽいです。</p><p>理由は割り当て時のアドレスが 0x55… で始まるからです。</p><p>新規割り当て時にスタック領域では上位アドレスから下にいき、ヒープ領域では下位アドレスから上方向にアドレスがシフトしますんで、ヒープ領域はスタック領域より下位のアドレスからスタートします。</p><p>厳密に言うとスタック領域も配列内の移動であれば下位アドレスから上方向に行きますが、アドレスの開始点は 0x7f…. となると思います。</p><p>まあスタティックオブジェクトはヒープというのはあくまでも実装依存だと思うので、必ずそうなるとは限らないってことだと思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch93.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt10.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch95.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+[1] 0x5582aba10041 : 10</pre><p>メモリーアドレスを見るとヒープっぽいです。</p><p>理由は割り当て時のアドレスが 0x55… で始まるからです。</p><p>新規割り当て時にスタック領域では上位アドレスから下にいき、ヒープ領域では下位アドレスから上方向にアドレスがシフトしますんで、ヒープ領域はスタック領域より下位のアドレスからスタートします。</p><p>厳密に言うとスタック領域も配列内の移動であれば下位アドレスから上方向に行きますが、アドレスの開始点は 0x7f…. となると思います。</p><p>まあスタティックオブジェクトはヒープというのはあくまでも実装依存だと思うので、必ずそうなるとは限らないってことだと思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch93.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt10.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch95.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

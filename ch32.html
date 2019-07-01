@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第32章 チャンク（ malloc_chunk ）</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch31.html" title="第31章 ヒープのヘッダーオブジェクト（ heap_info )" /><link rel="next" href="ch33.html" title="第33章 最少チャンクサイズと最少割り当てサイズ" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch31.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch33.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_チャンク_malloc_chunk"></a>第32章 チャンク（ malloc_chunk ）</h2></div></div></div><p>　チャンクはデータを保有したり、解放した空き領域、未使用の空き領域を管理するためのオブジェクトです。</p><p>　チャンクには 3 種類あります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第32章 チャンク（ malloc_chunk ）</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch31.html" title="第31章 ヒープのヘッダーオブジェクト（ heap_info )" /><link rel="next" href="ch33.html" title="第33章 最少チャンクサイズと最少割り当てサイズ" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch31.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch33.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_チャンク_malloc_chunk"></a>第32章 チャンク（ malloc_chunk ）</h2></div></div></div><p>　チャンクはデータを保有したり、解放した空き領域、未使用の空き領域を管理するためのオブジェクトです。</p><p>　チャンクには 3 種類あります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 割り当て済みチャンク
 </li><li class="listitem">
 フリーチャンク
 </li><li class="listitem">
 トップチャンク
 </li></ul></div><p>　割り当て済みチャンクは、Cのプログラムからアクセスできるチャンクですね。</p><p>　フリーチャンクは free() 関数等で割り当て済みチャンクを解放したものです。</p><p>　割り当てを行う際には、フリーチャンクを連結したフリーリストというデータ構造から、適当なサイズのチャンクを探してそれを再利用できます。</p><p>　トップチャンクは未使用のデータ領域のボーダーのアドレスを見つけるためのタグみたいなものです。</p><p>　これら 3 種類のチャンクは malloc_chunk 構造体の状態として表現できます。</p><p>　では構造体の定義を見てみましょう。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
-</p><pre class="programlisting">1002 /* Forward declarations.  */
+</p><pre xmlns="" class="prettyprint">1002 /* Forward declarations.  */
 1003 struct malloc_chunk;
 1004 typedef struct malloc_chunk* mchunkptr;</pre><p>
 </p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
-</p><pre class="programlisting">1054 /*
+</p><pre xmlns="" class="prettyprint">1054 /*
 1055   This struct declaration is misleading (but accurate and necessary).
 1056   It declares a "view" into memory allowing access to necessary
 1057   fields at known offsets from a given base. See explanation below.
@@ -28,7 +32,7 @@
 1069   struct malloc_chunk* fd_nextsize; /* double links -- used only if free. */
 1070   struct malloc_chunk* bk_nextsize;
 1071 };</pre><p>
-</p><p>　mchunk_previous_size は前のチャンクのサイズですが、フリーリストの連結に使われます。</p><p>　mchunk_size は下 3 桁分をフラグに使ったチャンクサイズです。</p><p>　フラグについては以下の図を見てください。</p><div class="figure"><a id="idm1346"></a><p class="title"><strong>図32.1 割り当て済みチャンク（allocated chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/allocated_chunk.png" alt="img/allocated_chunk.png" /></div></div></div><br class="figure-break" /><p>　まあ構造は初めて見ると複雑に見えるかと思いますがね。</p><p>　それでフラグには以下の 3 種類が存在します。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+</p><p>　mchunk_previous_size は前のチャンクのサイズですが、フリーリストの連結に使われます。</p><p>　mchunk_size は下 3 桁分をフラグに使ったチャンクサイズです。</p><p>　フラグについては以下の図を見てください。</p><div class="figure"><a id="idm1342"></a><p class="title"><strong>図32.1 割り当て済みチャンク（allocated chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/allocated_chunk.png" alt="img/allocated_chunk.png" /></div></div></div><br class="figure-break" /><p>　まあ構造は初めて見ると複雑に見えるかと思いますがね。</p><p>　それでフラグには以下の 3 種類が存在します。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
 A(NON_MAIN_ARENA)
 </span></dt><dd>
 メインアリーナでない
@@ -40,7 +44,7 @@ mmap() されたチャンクである
 P(PREV_INUSE)
 </span></dt><dd>
 前のチャンクが使用中
-</dd></dl></div><p>　Aは 0x4 に相当し M は 0x2、そして P は 0x1 として表現されます。</p><p>　ペイロードはアプリケーションの使用するユーザーデータに相当します。</p><p>　もしお疑いであれば malloc.c のコメントを確認すると良いでしょう。</p><pre class="programlisting">/*
+</dd></dl></div><p>　Aは 0x4 に相当し M は 0x2、そして P は 0x1 として表現されます。</p><p>　ペイロードはアプリケーションの使用するユーザーデータに相当します。</p><p>　もしお疑いであれば malloc.c のコメントを確認すると良いでしょう。</p><pre xmlns="" class="prettyprint">/*
 1091     chunk-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 1092       |             Size of previous chunk, if unallocated (P clear)  |
 1093       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -55,7 +59,7 @@ P(PREV_INUSE)
 1102       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 1103       |             Size of next chunk, in bytes                |A|0|1|
 1104       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-*/</pre><p>　つまりユーザーデータはチャンクサイズのすぐ次に来ることになります。</p><div class="figure"><a id="idm1373"></a><p class="title"><strong>図32.2 割り当て済みチャンクの内部（allocated chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/allocated_chunk_data.png" alt="img/allocated_chunk_data.png" /></div></div></div><br class="figure-break" /><p>　割り当て済みの領域は malloc_chunk 構造体の疑似バージョンと言えるかもしれませんね。</p><p>　ユーザーデータを強引に入れたって感じです。</p><p>　反対にフリーチャンクは以下のように malloc_chunk 構造体のパラメーターをフル活用できます。</p><div class="figure"><a id="idm1383"></a><p class="title"><strong>図32.3 フリーチャンク（free chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/free_chunk.png" alt="img/free_chunk.png" /></div></div></div><br class="figure-break" /><p>　奇妙に感じられた方は malloc.c の以下のコメントをチェックしてみてくださいね。</p><pre class="programlisting">/*
+*/</pre><p>　つまりユーザーデータはチャンクサイズのすぐ次に来ることになります。</p><div class="figure"><a id="idm1369"></a><p class="title"><strong>図32.2 割り当て済みチャンクの内部（allocated chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/allocated_chunk_data.png" alt="img/allocated_chunk_data.png" /></div></div></div><br class="figure-break" /><p>　割り当て済みの領域は malloc_chunk 構造体の疑似バージョンと言えるかもしれませんね。</p><p>　ユーザーデータを強引に入れたって感じです。</p><p>　反対にフリーチャンクは以下のように malloc_chunk 構造体のパラメーターをフル活用できます。</p><div class="figure"><a id="idm1379"></a><p class="title"><strong>図32.3 フリーチャンク（free chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/free_chunk.png" alt="img/free_chunk.png" /></div></div></div><br class="figure-break" /><p>　奇妙に感じられた方は malloc.c の以下のコメントをチェックしてみてくださいね。</p><pre xmlns="" class="prettyprint">/*
 1116     chunk-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 1117       |             Size of previous chunk, if unallocated (P clear)  |
 1118       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -73,7 +77,7 @@ P(PREV_INUSE)
 1130       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 1131       |             Size of next chunk, in bytes                |A|0|0|
 1132       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-*/</pre><p>　これを図に直すと以下のようになります。</p><div class="figure"><a id="idm1393"></a><p class="title"><strong>図32.4 フリーチャンクの内部（small free chunk、大きめでない場合）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/free_chunk_data.png" alt="img/free_chunk_data.png" /></div></div></div><br class="figure-break" /><p>　fd_nextsize と bk_nextsize は大きめのフリーチャンク（large free chunk）の時のみに使われるらしいです。</p><p>　なので小さめのフリーチャンク（small free chunk）の時には fd_nextsize と bk_nextsize は使われません。</p><p>　ちなみにフリーチャンクについては大きさによって、保存されるデータ構造が異なります。</p><p>　このチャンクを収納してくれるデータ構造を bin と呼びます。</p><p>　bin はポインターの配列ですが、</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+*/</pre><p>　これを図に直すと以下のようになります。</p><div class="figure"><a id="idm1389"></a><p class="title"><strong>図32.4 フリーチャンクの内部（small free chunk、大きめでない場合）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/free_chunk_data.png" alt="img/free_chunk_data.png" /></div></div></div><br class="figure-break" /><p>　fd_nextsize と bk_nextsize は大きめのフリーチャンク（large free chunk）の時のみに使われるらしいです。</p><p>　なので小さめのフリーチャンク（small free chunk）の時には fd_nextsize と bk_nextsize は使われません。</p><p>　ちなみにフリーチャンクについては大きさによって、保存されるデータ構造が異なります。</p><p>　このチャンクを収納してくれるデータ構造を bin と呼びます。</p><p>　bin はポインターの配列ですが、</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 Fast bin
 </li><li class="listitem">
 Unsorted bin
@@ -81,4 +85,4 @@ Unsorted bin
 Small bin
 </li><li class="listitem">
 Large bin
-</li></ul></div><p>　ビンの詳細は後で説明しますが、どのビンに入るかによってチャンクの内部データが変動します。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch31.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch33.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+</li></ul></div><p>　ビンの詳細は後で説明しますが、どのビンに入るかによってチャンクの内部データが変動します。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch31.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch33.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

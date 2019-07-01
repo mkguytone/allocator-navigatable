@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第76章 fstat 関数を使ってファイルサイズを指定する場合</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt06.html" title="パート VI. mmap" /><link rel="prev" href="ch75s03.html" title="75.3. fork() を 4 回コールする" /><link rel="next" href="ch77.html" title="第77章 MAP_PRIVATE の Copy-On-Write" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch75s03.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch77.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_fstat_関数を使ってファイルサイズを指定する場合"></a>第76章 fstat 関数を使ってファイルサイズを指定する場合</h2></div></div></div><p>　fork() も軽く説明したことですし… mmap() と関係のあるもう一つの関数もついでに大バーゲンで説明しちゃいましょう！</p><p>　fstat() 関数については前にやりましたよね？</p><p>　stat 構造体とか… stat 構造体とか…　stat 構造体とかです…</p><p>　覚えてますかね…　(´・ω・｀)</p><p>　struct stat 構造体にはファイルサイズのフィールド st_size があるので、オフセットとかなしでファイル全体を取り込むのであればこちらを mmap の length 引数に指定できます。</p><p>　では軽く実装してみましょう。</p><p><strong>main.c. </strong>
-</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第76章 fstat 関数を使ってファイルサイズを指定する場合</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt06.html" title="パート VI. mmap" /><link rel="prev" href="ch75s03.html" title="75.3. fork() を 4 回コールする" /><link rel="next" href="ch77.html" title="第77章 MAP_PRIVATE の Copy-On-Write" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch75s03.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch77.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_fstat_関数を使ってファイルサイズを指定する場合"></a>第76章 fstat 関数を使ってファイルサイズを指定する場合</h2></div></div></div><p>　fork() も軽く説明したことですし… mmap() と関係のあるもう一つの関数もついでに大バーゲンで説明しちゃいましょう！</p><p>　fstat() 関数については前にやりましたよね？</p><p>　stat 構造体とか… stat 構造体とか…　stat 構造体とかです…</p><p>　覚えてますかね…　(´・ω・｀)</p><p>　struct stat 構造体にはファイルサイズのフィールド st_size があるので、オフセットとかなしでファイル全体を取り込むのであればこちらを mmap の length 引数に指定できます。</p><p>　では軽く実装してみましょう。</p><p><strong>main.c. </strong>
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;stdio.h&gt;
   2 #include &lt;stdlib.h&gt;
   3 #include &lt;string.h&gt;
   4 #include &lt;sys/mman.h&gt;
@@ -52,7 +56,7 @@
  50   return 0;
  51 }</pre><p>
 </p><p><strong>ビルドと実行. </strong>
-</p><pre class="programlisting">$ gcc main.c
+</p><pre xmlns="" class="prettyprint">$ gcc main.c
 $ ./a.out
 mm[0] =&gt; a
 mm[1] =&gt; b
@@ -67,10 +71,10 @@ mm[8] =&gt;
 mm[9] =&gt;
 $ cat abc.txt
 abcdef</pre><p>
-</p><p>　まず変数の宣言です。</p><pre class="programlisting"> 14   int fd,i;
+</p><p>　まず変数の宣言です。</p><pre xmlns="" class="prettyprint"> 14   int fd,i;
  15   struct stat sb;
  16   char buf[BUF_SIZE];
- 17   char *mm;</pre><p>　fstat() 関数は fd と sb を引数とします。</p><p>　fd は open() 関数で開いたファイル記述子を代入します。</p><pre class="programlisting"> 21   fd = open("abc.txt",O_CREAT|O_RDWR|O_TRUNC,0644);
+ 17   char *mm;</pre><p>　fstat() 関数は fd と sb を引数とします。</p><p>　fd は open() 関数で開いたファイル記述子を代入します。</p><pre xmlns="" class="prettyprint"> 21   fd = open("abc.txt",O_CREAT|O_RDWR|O_TRUNC,0644);
  22   if(fd &lt; 0) {
  23     perror("ファイルを開けません");
  24     exit(1);
@@ -79,12 +83,12 @@ abcdef</pre><p>
  27   if(fstat(fd,&amp;sb) == -1) {
  28     perror("stat");
  29     exit(1);
- 30   }</pre><p>　まあ「 abc.txt 」を開いて空の buf を書き込むことでファイル側のサイズが更新され、それを fstat() 関数で sb のアドレスに更新します。</p><p>　次は mmap() のコールです。</p><pre class="programlisting"> 32   mm = mmap(NULL,sb.st_size,PROT_WRITE|PROT_READ,MAP_SHARED,fd,0);
+ 30   }</pre><p>　まあ「 abc.txt 」を開いて空の buf を書き込むことでファイル側のサイズが更新され、それを fstat() 関数で sb のアドレスに更新します。</p><p>　次は mmap() のコールです。</p><pre xmlns="" class="prettyprint"> 32   mm = mmap(NULL,sb.st_size,PROT_WRITE|PROT_READ,MAP_SHARED,fd,0);
  33   if(mm == MAP_FAILED){
  34     perror("mmap");
  35     exit(1);
- 36   }</pre><p>　まずマップの種類は MAP_SHARED となっており、ファイルへの更新は他のプロセスから見れるようになってます。</p><p>　ただこのサンプルコードでは、fork() をコールしていないので MAP_PRIVATE と結果は変わらないです。</p><p>　まあ、このソースコードでは外から見える必要性はないですがね。</p><pre class="programlisting"> 43   msync(mm,sb.st_size,MS_SYNC);</pre><p>　msync() はファイルに対してデータを反映させる関数です。</p><p>　一応 munmap() 関数でアンマップすると書き込みデータがマップしたファイルに確実に更新されるのですが、munmap() を呼ばないでファイル更新をするなら msync() を呼び出します。</p><pre class="programlisting"> 38   for(i = 0; i &lt; sb.st_size-2; i++)
+ 36   }</pre><p>　まずマップの種類は MAP_SHARED となっており、ファイルへの更新は他のプロセスから見れるようになってます。</p><p>　ただこのサンプルコードでは、fork() をコールしていないので MAP_PRIVATE と結果は変わらないです。</p><p>　まあ、このソースコードでは外から見える必要性はないですがね。</p><pre xmlns="" class="prettyprint"> 43   msync(mm,sb.st_size,MS_SYNC);</pre><p>　msync() はファイルに対してデータを反映させる関数です。</p><p>　一応 munmap() 関数でアンマップすると書き込みデータがマップしたファイルに確実に更新されるのですが、munmap() を呼ばないでファイル更新をするなら msync() を呼び出します。</p><pre xmlns="" class="prettyprint"> 38   for(i = 0; i &lt; sb.st_size-2; i++)
  39     mm[i] = 'a'+i;
  40   mm[sb.st_size-2] = '\n';
- 41   mm[sb.st_size-1] = '\0';</pre><p>　mm は mmap() でマッピングをしたバッファーなのでこれにデータを入れておいてますね。</p><pre class="programlisting"> 47   munmap(mm,sb.st_size);
- 48   close(fd);</pre><p>　 munmap() は戻り値が -1 の場合にエラーとなりますんで、念の為にエラー処理を追加することができます。</p><p>　それとファイル記述子を close() で閉じてもマッピングは解除されないので munmap は必ず使うようにしましょう。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch75s03.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt06.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch77.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+ 41   mm[sb.st_size-1] = '\0';</pre><p>　mm は mmap() でマッピングをしたバッファーなのでこれにデータを入れておいてますね。</p><pre xmlns="" class="prettyprint"> 47   munmap(mm,sb.st_size);
+ 48   close(fd);</pre><p>　 munmap() は戻り値が -1 の場合にエラーとなりますんで、念の為にエラー処理を追加することができます。</p><p>　それとファイル記述子を close() で閉じてもマッピングは解除されないので munmap は必ず使うようにしましょう。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch75s03.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt06.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch77.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

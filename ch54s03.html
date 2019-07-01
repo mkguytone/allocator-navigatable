@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>54.3. アラインメントの最少サイズ</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch54.html" title="第54章 posix_memalign() / aligned_alloc()" /><link rel="prev" href="ch54s02.html" title="54.2. アラインメントの仕組み" /><link rel="next" href="ch54s04.html" title="54.4. 大きめのアラインメント" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch54s02.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch54s04.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_アラインメントの最少サイズ"></a>54.3. アラインメントの最少サイズ</h2></div></div></div><p>　アラインメントの最少サイズはプラットフォームによって変わるのですが、計算式は以下ソースコードの MALLOC_ALIGNMENT マクロの定義の通りです。</p><p><strong>malloc-alignment.h（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/sysdeps/generic/malloc-alignment.h）. </strong>
-</p><pre class="programlisting"> 22 /* MALLOC_ALIGNMENT is the minimum alignment for malloc'ed chunks.  It
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>54.3. アラインメントの最少サイズ</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch54.html" title="第54章 posix_memalign() / aligned_alloc()" /><link rel="prev" href="ch54s02.html" title="54.2. アラインメントの仕組み" /><link rel="next" href="ch54s04.html" title="54.4. 大きめのアラインメント" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch54s02.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch54s04.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_アラインメントの最少サイズ"></a>54.3. アラインメントの最少サイズ</h2></div></div></div><p>　アラインメントの最少サイズはプラットフォームによって変わるのですが、計算式は以下ソースコードの MALLOC_ALIGNMENT マクロの定義の通りです。</p><p><strong>malloc-alignment.h（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/sysdeps/generic/malloc-alignment.h）. </strong>
+</p><pre xmlns="" class="prettyprint"> 22 /* MALLOC_ALIGNMENT is the minimum alignment for malloc'ed chunks.  It
  23    must be a power of two at least 2 * SIZE_SZ, even on machines for
  24    which smaller alignments would suffice. It may be defined as larger
  25    than this though. Note however that code and data structures are
  26    optimized for the case of 8-byte alignment.  */
  27 #define MALLOC_ALIGNMENT (2 * SIZE_SZ &lt; __alignof__ (long double) \
  28         ? __alignof__ (long double) : 2 * SIZE_SZ)</pre><p>
-</p><p>　少し難し目ではありますが 64 ビットでは SIZE_SZ が 8 バイトになる前提で最少値の検証をしてみます。</p><pre class="programlisting">  1 #include &lt;iostream&gt;
+</p><p>　少し難し目ではありますが 64 ビットでは SIZE_SZ が 8 バイトになる前提で最少値の検証をしてみます。</p><pre xmlns="" class="prettyprint">  1 #include &lt;iostream&gt;
   2
   3 #define SIZE_SZ 8
   4 #define MALLOC_ALIGNMENT (2 * SIZE_SZ &lt; alignof(long double) \
@@ -18,8 +22,8 @@
   9   std::cout &lt;&lt; alignof(long double) &lt;&lt; '\n';
  10   std::cout &lt;&lt; MALLOC_ALIGNMENT &lt;&lt; '\n';
  11 }</pre><p><strong>ビルドと出力結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp
 $ ./a.out
 16
 16</pre><p>
-</p><p>　単にマクロの結果を表示しただけですが、このケースだと最少アラインメントサイズは alignof() の結果と同じになっています。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch54s02.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch54.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch54s04.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+</p><p>　単にマクロの結果を表示しただけですが、このケースだと最少アラインメントサイズは alignof() の結果と同じになっています。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch54s02.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch54.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch54s04.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

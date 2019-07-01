@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第55章 std::launder ( C++17 )</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch54s05.html" title="54.5. 複数のアラインメントでの検証" /><link rel="next" href="ch56.html" title="第56章 std::aligned_storage ( C++11 )" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch54s05.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch56.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_std_launder_c_17"></a>第55章 std::launder ( C++17 )</h2></div></div></div><p>　ロンダリングとは掃除する、キレイにする、洗うことを意味します。</p><p>　C++17 からは、以前にはなかったメモリーロンダリングという要件が追加されてます。</p><p>　具体的に必要となるシチュエーションは 2 つあります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第55章 std::launder ( C++17 )</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch54s05.html" title="54.5. 複数のアラインメントでの検証" /><link rel="next" href="ch56.html" title="第56章 std::aligned_storage ( C++11 )" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch54s05.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch56.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_std_launder_c_17"></a>第55章 std::launder ( C++17 )</h2></div></div></div><p>　ロンダリングとは掃除する、キレイにする、洗うことを意味します。</p><p>　C++17 からは、以前にはなかったメモリーロンダリングという要件が追加されてます。</p><p>　具体的に必要となるシチュエーションは 2 つあります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 既に存在する同型の記憶域（またはアドレス）にオブジェクトを生成した場合に、古いポインターが const や参照データメンバーを含むため再利用は未定義動作となる。
 </li></ul></div><p><strong>例（const データメンバーを持つポインターの再利用）. </strong>
-</p><pre class="programlisting">//main.cpp
+</p><pre xmlns="" class="prettyprint">//main.cpp
   1 #include &lt;iostream&gt;
   2
   3 struct Foo {
@@ -20,14 +24,14 @@
  15   return 0;
  16 }</pre><p>
 </p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp -std=c++17
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp -std=c++17
 $ ./a.out
 foo_old-&gt;x == 200 @ 0x5611f8646e70
 foo_new-&gt;x == 200 @ 0x5611f8646e70</pre><p>
 </p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 記憶域（またはアドレス）を提供するためのオブジェクトを指すポインターを利用して、配置 new で生成したオブジェクトを指すポインターからのオブジェクトアクセスは未定義動作となる。
 </li></ul></div><p><strong>例（配置 new をした記憶域に対して reinterpret_cast をして得たポインターからのオブジェクトアクセス）. </strong>
-</p><pre class="programlisting">//main.cpp
+</p><pre xmlns="" class="prettyprint">//main.cpp
   1 #include &lt;iostream&gt;
   2 #include &lt;cstddef&gt;
   3
@@ -45,16 +49,16 @@ foo_new-&gt;x == 200 @ 0x5611f8646e70</pre><p>
  15   return 0;
  16 }</pre><p>
 </p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp -std=c++17
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp -std=c++17
 $ ./a.out
 100 @ 0x7ffe745bdd00
 100 @ 0x7ffe745bdd00</pre><p>
-</p><p>　どちらの未定義動作もコンパイルは通るはずですしサンプルコードの実行結果にも奇妙な動きは見られませんが、 C++17 の標準規格には適合しない未定義動作（ undefined behaviour ）に分類されてしまうらしいです。</p><p>　未定義動作はバグの原因になったり、セキュリティーホールになる余地があるにも関わらず、結果的にコンパイルが通ってしまう状況を作りますんで、こうした一見問題なさそうな例になってしまいます。</p><p>　基本的に標準規格が想定しないような逸脱したコードを書くと未定義動作なので、まあ気をつけたほうが良いでしょう。</p><p>　つまり上述 2 つの例は不適切なオブジェクトへのアクセスってことです。</p><p>　これを解決してくれるのが C++17 から導入された std::launder() 関数です。</p><pre class="programlisting">#include &lt;new&gt;
+</p><p>　どちらの未定義動作もコンパイルは通るはずですしサンプルコードの実行結果にも奇妙な動きは見られませんが、 C++17 の標準規格には適合しない未定義動作（ undefined behaviour ）に分類されてしまうらしいです。</p><p>　未定義動作はバグの原因になったり、セキュリティーホールになる余地があるにも関わらず、結果的にコンパイルが通ってしまう状況を作りますんで、こうした一見問題なさそうな例になってしまいます。</p><p>　基本的に標準規格が想定しないような逸脱したコードを書くと未定義動作なので、まあ気をつけたほうが良いでしょう。</p><p>　つまり上述 2 つの例は不適切なオブジェクトへのアクセスってことです。</p><p>　これを解決してくれるのが C++17 から導入された std::launder() 関数です。</p><pre xmlns="" class="prettyprint">#include &lt;new&gt;
 template &lt;class T&gt;
 constexpr T* launder(T* p) noexcept;</pre><p>　引数 p はロンダリングが必要なポインターです。</p><p>　std::launder(p) によって以下の 2 種類のロンダリングが可能となります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 const メンバーを変更するオブジェクトを指している古いポインターをロンダリングして再利用できるようにする。
 </li></ul></div><p><strong>例（const データメンバーを持つポインターのロンダリング）. </strong>
-</p><pre class="programlisting">  1 #include &lt;iostream&gt;
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;iostream&gt;
   2 #include &lt;new&gt;
   3
   4 struct Foo {
@@ -70,14 +74,14 @@ const メンバーを変更するオブジェクトを指している古いポ�
  14   return 0;
  15 }</pre><p>
 </p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp -std=c++17
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp -std=c++17
 $ ./a.out
 std::launder(foo_old)-&gt;x == 200 @ 0x55c12c3a8e70</pre><p>
-</p><p>　この const メンバーは不変なわけですが配置 new を使うことで以下のように値を変更ができてしまいます。</p><pre class="programlisting"> 10   Foo *foo_old = new Foo{100};
- 11   Foo *foo_new = new (foo_old) Foo{200}; //危険！</pre><p>　これは未定義動作に該当するために std::launder() 関数を使ってロンダリングする必要があります。</p><pre class="programlisting"> 13   std::cout &lt;&lt; "std::launder(foo_old)-&gt;x == " &lt;&lt; foo_x &lt;&lt; " @ " &lt;&lt; foo_old &lt;&lt; '\n';</pre><p>　こんな感じで古いポインターをロンダします。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+</p><p>　この const メンバーは不変なわけですが配置 new を使うことで以下のように値を変更ができてしまいます。</p><pre xmlns="" class="prettyprint"> 10   Foo *foo_old = new Foo{100};
+ 11   Foo *foo_new = new (foo_old) Foo{200}; //危険！</pre><p>　これは未定義動作に該当するために std::launder() 関数を使ってロンダリングする必要があります。</p><pre xmlns="" class="prettyprint"> 13   std::cout &lt;&lt; "std::launder(foo_old)-&gt;x == " &lt;&lt; foo_x &lt;&lt; " @ " &lt;&lt; foo_old &lt;&lt; '\n';</pre><p>　こんな感じで古いポインターをロンダします。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 配置 new で生成したオブジェクトを指すポインターをロンダリングしてオブジェクトアクセスを可能にする
 </li></ul></div><p><strong>例（配置 new をした記憶域に対して reinterpret_cast をして得たポインターのロンダリング）. </strong>
-</p><pre class="programlisting">  1 #include &lt;iostream&gt;
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;iostream&gt;
   2 #include &lt;cstddef&gt;
   3 #include &lt;new&gt;
   4
@@ -94,8 +98,8 @@ std::launder(foo_old)-&gt;x == 200 @ 0x55c12c3a8e70</pre><p>
  15   return 0;
  16 }</pre><p>
 </p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp -std=c++17
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp -std=c++17
 $ ./a.out
 100 @ 0x7ffcec143240</pre><p>
-</p><p>　このケースでは std::byte[] 型のメモリー領域の上に Bar 型の配置 new をしています。</p><pre class="programlisting"> 11   alignas(Bar) std::byte bar_buf[32];
- 12   Bar *bar = new (bar_buf) Bar{100};</pre><p>　まあ新たに割り当てた bar ポインターを使うなら問題なしなんですが、 bar_buf は古いポインターであり、これへのアクセスは未定義動作となるとのことです。</p><p>　前のケースと同様に古いポインターを std::launder でロンダリングします。</p><pre class="programlisting"> 13   int val = std::launder(reinterpret_cast&lt;Bar*&gt;(&amp;bar_buf))-&gt;x;</pre><p>　どちらのケースも面倒ではありますが、何気なく使ってしまいそうな式っぽいので気をつけましょうね。</p><p>　C++17 から導入された std::launder() はアロケーター設計者の宿敵（ネメシス）とでも言うべき機能ですが、少なくとも問題となる前提条件を抑えておけば問題は無いと…　思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch54s05.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch56.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+</p><p>　このケースでは std::byte[] 型のメモリー領域の上に Bar 型の配置 new をしています。</p><pre xmlns="" class="prettyprint"> 11   alignas(Bar) std::byte bar_buf[32];
+ 12   Bar *bar = new (bar_buf) Bar{100};</pre><p>　まあ新たに割り当てた bar ポインターを使うなら問題なしなんですが、 bar_buf は古いポインターであり、これへのアクセスは未定義動作となるとのことです。</p><p>　前のケースと同様に古いポインターを std::launder でロンダリングします。</p><pre xmlns="" class="prettyprint"> 13   int val = std::launder(reinterpret_cast&lt;Bar*&gt;(&amp;bar_buf))-&gt;x;</pre><p>　どちらのケースも面倒ではありますが、何気なく使ってしまいそうな式っぽいので気をつけましょうね。</p><p>　C++17 から導入された std::launder() はアロケーター設計者の宿敵（ネメシス）とでも言うべき機能ですが、少なくとも問題となる前提条件を抑えておけば問題は無いと…　思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch54s05.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch56.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

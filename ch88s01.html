@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>88.1. スタックアロケーター（可変長のリクエストサイズに対応、難易度高いのでスキップ推奨）</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch88.html" title="第88章 配列内のアドレスの走査" /><link rel="prev" href="ch88.html" title="第88章 配列内のアドレスの走査" /><link rel="next" href="ch89.html" title="第89章 ヒープへのフォールバック付きスタックアロケーター" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch88.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch89.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_スタックアロケーター_可変長のリクエストサイズに対応_難易度高いのでスキップ推奨"></a>88.1. スタックアロケーター（可変長のリクエストサイズに対応、難易度高いのでスキップ推奨）</h2></div></div></div><p>　この項目では固定長のスタックアロケーターを紹介します。</p><p>　スタックアロケーターは割り当てたいメモリーのサイズが可変長の場合だと、いくつか念頭にしておくべき点が出てきます。</p><p>　実装の観点から感がえると、割り当てるサイズが固定長のサイズであり、解放は最後に割り当てたメモリー領域からする前提が一番シンプルです。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>88.1. スタックアロケーター（可変長のリクエストサイズに対応、難易度高いのでスキップ推奨）</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch88.html" title="第88章 配列内のアドレスの走査" /><link rel="prev" href="ch88.html" title="第88章 配列内のアドレスの走査" /><link rel="next" href="ch89.html" title="第89章 ヒープへのフォールバック付きスタックアロケーター" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch88.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch89.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_スタックアロケーター_可変長のリクエストサイズに対応_難易度高いのでスキップ推奨"></a>88.1. スタックアロケーター（可変長のリクエストサイズに対応、難易度高いのでスキップ推奨）</h2></div></div></div><p>　この項目では固定長のスタックアロケーターを紹介します。</p><p>　スタックアロケーターは割り当てたいメモリーのサイズが可変長の場合だと、いくつか念頭にしておくべき点が出てきます。</p><p>　実装の観点から感がえると、割り当てるサイズが固定長のサイズであり、解放は最後に割り当てたメモリー領域からする前提が一番シンプルです。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 リクエストサイズは一定とする
 </li><li class="listitem">
 最後に割り当てたチャンクから解放していく
-</li></ul></div><p>　この条件が満たされるなら、以下のような関数の実装で割り当て、解放ができます。</p><pre class="programlisting">allocate（リクエスト個数）{
+</li></ul></div><p>　この条件が満たされるなら、以下のような関数の実装で割り当て、解放ができます。</p><pre xmlns="" class="prettyprint">allocate（リクエスト個数）{
   スタックポインター += (リクエスト個数 * ブロックサイズ);
   return スタックポインター;
 }
@@ -19,7 +23,7 @@ deallocate (リクエスト個数) {
 </li><li class="listitem">
 割り当てたポインターのサイズから、キャッシュプールの割り出し
 </li></ul></div><p>　どちらも難しいですが実装してみましょう。</p><p><strong>main.cpp. </strong>
-</p><pre class="programlisting">  1 #include &lt;cstddef&gt;
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;cstddef&gt;
   2 #include &lt;memory&gt;
   3 #include &lt;cassert&gt;
   4 #include &lt;new&gt;
@@ -228,7 +232,7 @@ deallocate (リクエスト個数) {
 207   }
 208 }</pre><p>
 </p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp -std=c++17
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp -std=c++17
 $ ./a.out
 size == 1
 NEW! M_pool_index : M_block_in_use_ = 0 : 0
@@ -258,7 +262,7 @@ reuse pointer 0x56354f80a228 for size 16
 reuse pointer 0x56354f80a218 for size 16
 reuse pointer 0x56354f80a208 for size 16
 reuse pointer 0x56354f80a1f8 for size 16</pre><p>
-</p><p>　このアロケーターは allocator クラステンプレートに実装していますね。</p><pre class="programlisting"> 11 #define MAX_OBJECTS 32
+</p><p>　このアロケーターは allocator クラステンプレートに実装していますね。</p><pre xmlns="" class="prettyprint"> 11 #define MAX_OBJECTS 32
  12
  13 template&lt;typename T,size_t N&gt;
  14 class allocator
@@ -317,17 +321,17 @@ M_pool_index_
 M_block_size_
 </span></dt><dd>
 アロケーターが割り当てるブロック（最少単位）のサイズ
-</dd></dl></div><p>　これらのオブジェクト・変数はコンストラクターで初期化されています。</p><pre class="programlisting"> 22   allocator()
+</dd></dl></div><p>　これらのオブジェクト・変数はコンストラクターで初期化されています。</p><pre xmlns="" class="prettyprint"> 22   allocator()
  23     :
  24     M_max_objects_(MAX_OBJECTS),
  25     M_pool_index_(0),
  26     M_block_size_(sizeof(std::byte[N]) &lt; 8 ? sizeof(long long) : sizeof(std::byte[N]))
  27   {
  28     Mp_pool_ = ::new (&amp;Mp_Mem_) std::byte[M_block_size_*MAX_OBJECTS];
- 29   }</pre><p>　 Mp_pool_ は Mp_mem_ のアドレスにある std::byte[] 配列を指すポインターとなり、これをメモリープールと呼びます。</p><p>　メモリープール Mp_pool_ は単に割り当て可能なメモリー領域となります。</p><p>　そして MAX_OBJECTS は任意の値ですが 32 個になってますね。</p><pre class="programlisting"> 11 #define MAX_OBJECTS 32</pre><p>　これは最大オブジェクト数を意味します。</p><pre class="programlisting"> 24     M_max_objects_(MAX_OBJECTS),</pre><p>　したがって M_max_objects が最大オブジェクト「数」ってことです。</p><p>　M_block_size_ はブロックのバイトサイズなので個数じゃないので混同しないでくださいね。</p><p>　ブロックサイズはオブジェクトのサイズである「sizeof(T)」以上に念の為にとっておきます。</p><pre class="programlisting"> 19   static_assert(sizeof(std::byte[N]) &gt;= sizeof(T));</pre><p>　さらにポインター型をサポートしたいのでブロックサイズは 8 バイト以上に強制的に設定しておきます。</p><pre class="programlisting"> 26     M_block_size_(sizeof(std::byte[N]) &lt; 8 ? sizeof(long long) : sizeof(std::byte[N]))</pre><p>　もっと小さい値を使う場合にしても、後で STL コンテナと使う場合には reserve() 関数を使う std::vector 等では コンテナが勝手に使い方を決めてしまうので、かなり無駄になるかも知りませんね…</p><p>　(´・ω・｀)</p><p>　後はメモリープールはこの 2 つを使って定義します。</p><pre class="programlisting"> 28     Mp_pool_ = ::new (&amp;Mp_Mem_) std::byte[M_block_size_*MAX_OBJECTS];</pre><p>　voidポインターでなく、std::byte ポインターをベースに使うのはポインター算術が使えるからです。</p><p>　まあ char ポインターでも良いんですけどね…</p><p>　ちなみにスタックアロケーターはヒープアロケーターと比べ大容量に弱いので MAX_OBJECTS または M_max_objects はあまり巨大な数値にするのはやめときましょう。</p><p>　後はメモリーを解放後に管理するためのキャッシュ記憶域ですが、これは単に単方向の連結リストを使います。</p><pre class="programlisting"> 85   // 使用可能なメモリータグ（一度割当、後に開放された領域）
+ 29   }</pre><p>　 Mp_pool_ は Mp_mem_ のアドレスにある std::byte[] 配列を指すポインターとなり、これをメモリープールと呼びます。</p><p>　メモリープール Mp_pool_ は単に割り当て可能なメモリー領域となります。</p><p>　そして MAX_OBJECTS は任意の値ですが 32 個になってますね。</p><pre xmlns="" class="prettyprint"> 11 #define MAX_OBJECTS 32</pre><p>　これは最大オブジェクト数を意味します。</p><pre xmlns="" class="prettyprint"> 24     M_max_objects_(MAX_OBJECTS),</pre><p>　したがって M_max_objects が最大オブジェクト「数」ってことです。</p><p>　M_block_size_ はブロックのバイトサイズなので個数じゃないので混同しないでくださいね。</p><p>　ブロックサイズはオブジェクトのサイズである「sizeof(T)」以上に念の為にとっておきます。</p><pre xmlns="" class="prettyprint"> 19   static_assert(sizeof(std::byte[N]) &gt;= sizeof(T));</pre><p>　さらにポインター型をサポートしたいのでブロックサイズは 8 バイト以上に強制的に設定しておきます。</p><pre xmlns="" class="prettyprint"> 26     M_block_size_(sizeof(std::byte[N]) &lt; 8 ? sizeof(long long) : sizeof(std::byte[N]))</pre><p>　もっと小さい値を使う場合にしても、後で STL コンテナと使う場合には reserve() 関数を使う std::vector 等では コンテナが勝手に使い方を決めてしまうので、かなり無駄になるかも知りませんね…</p><p>　(´・ω・｀)</p><p>　後はメモリープールはこの 2 つを使って定義します。</p><pre xmlns="" class="prettyprint"> 28     Mp_pool_ = ::new (&amp;Mp_Mem_) std::byte[M_block_size_*MAX_OBJECTS];</pre><p>　voidポインターでなく、std::byte ポインターをベースに使うのはポインター算術が使えるからです。</p><p>　まあ char ポインターでも良いんですけどね…</p><p>　ちなみにスタックアロケーターはヒープアロケーターと比べ大容量に弱いので MAX_OBJECTS または M_max_objects はあまり巨大な数値にするのはやめときましょう。</p><p>　後はメモリーを解放後に管理するためのキャッシュ記憶域ですが、これは単に単方向の連結リストを使います。</p><pre xmlns="" class="prettyprint"> 85   // 使用可能なメモリータグ（一度割当、後に開放された領域）
  86   struct block_not_in_use {
  87     block_not_in_use *next;
- 88   };</pre><p>　struct block_not_in_use は一つのポインターを持つだけの連結リストとして、フリーチャンクを保持します。</p><p>　具体には deallocate() をコールするたびにｍ以下のように先頭ポインターを先に進めることで使います。</p><p>　先頭を更新していきます。</p><pre class="programlisting"> 65   // 開放(deallocate)時に使用可能チャンクを更新
+ 88   };</pre><p>　struct block_not_in_use は一つのポインターを持つだけの連結リストとして、フリーチャンクを保持します。</p><p>　具体には deallocate() をコールするたびにｍ以下のように先頭ポインターを先に進めることで使います。</p><p>　先頭を更新していきます。</p><pre xmlns="" class="prettyprint"> 65   // 開放(deallocate)時に使用可能チャンクを更新
  66   void rewind(void* memory,size_t size){
  67     auto head = M_free_list_[size];
  68     block_not_in_use* pblock = static_cast&lt;block_not_in_use*&gt;(memory);
@@ -335,7 +339,7 @@ M_block_size_
  70     head = pblock;
  71     M_free_list_[size] = head;
  72     std::printf("rewind cache head %p for size %lu\n",head,size);
- 73   }</pre><p>　この関数によって用済みになったメモリーをリワインド（巻き戻す）していきます。</p><p>　正確には最後にキャッシュ( struct block_not_in_use* )にいれたチャンクが先頭( head ) になるので、巻き戻すというより押し込むの方が正しそうですね…</p><p>　(´・ω・｀)</p><p>　まあ慣れちゃって癖なので気にしないヨ…</p><p>　次にフリーチャンクを再割り当て、再利用に使うための関数です。</p><pre class="programlisting"> 74   // 割当(allocate)時に開放された使用可能領域から使う
+ 73   }</pre><p>　この関数によって用済みになったメモリーをリワインド（巻き戻す）していきます。</p><p>　正確には最後にキャッシュ( struct block_not_in_use* )にいれたチャンクが先頭( head ) になるので、巻き戻すというより押し込むの方が正しそうですね…</p><p>　(´・ω・｀)</p><p>　まあ慣れちゃって癖なので気にしないヨ…</p><p>　次にフリーチャンクを再割り当て、再利用に使うための関数です。</p><pre xmlns="" class="prettyprint"> 74   // 割当(allocate)時に開放された使用可能領域から使う
  75   void* pop_from_pool(block_not_in_use* head,size_t n){
  76     block_not_in_use* pblock = nullptr;
  77     if(head)
@@ -345,12 +349,12 @@ M_block_size_
  81     }
  82     M_free_list_[n*M_block_size_] = head;
  83     return static_cast&lt;void*&gt;(pblock);
- 84   }</pre><p>　これは allocate() 関数からコールする関数ですが head （先頭）にフリーチャンクが存在するなら、それを pblock に代入して head を連結リストから取り出し、直前の head を現在の head に更新します。</p><pre class="programlisting"> 77     if(head)
+ 84   }</pre><p>　これは allocate() 関数からコールする関数ですが head （先頭）にフリーチャンクが存在するなら、それを pblock に代入して head を連結リストから取り出し、直前の head を現在の head に更新します。</p><pre xmlns="" class="prettyprint"> 77     if(head)
  78     {
  79       pblock = head;
  80       head = head-&gt;next;
- 81     }</pre><p>　後は更新されたであろう head をフリーリストにいれておきます。</p><pre class="programlisting"> 82     M_free_list_[n*M_block_size_] = head;</pre><p>　M_free_list_ の型は free_list_t となり以下のように定義されています。</p><pre class="programlisting"> 18   typedef std::map&lt;size_t,block_not_in_use*&gt; free_list_t;</pre><p>　まあつまり、重複なしのマップデータ構造となりますが、すでに存在したら何もしないですし、存在するアドレスならデータ構造に挿入されます。</p><p>　まあいきなりなので補足しますね。</p><pre class="programlisting"> 89   size_map_t M_size_map_;
- 90   free_list_t M_free_list_;</pre><p>　この 2 つは以下のような定義になっています。</p><pre class="programlisting"> 17   typedef std::map&lt;void*,size_t&gt; size_map_t;
+ 81     }</pre><p>　後は更新されたであろう head をフリーリストにいれておきます。</p><pre xmlns="" class="prettyprint"> 82     M_free_list_[n*M_block_size_] = head;</pre><p>　M_free_list_ の型は free_list_t となり以下のように定義されています。</p><pre xmlns="" class="prettyprint"> 18   typedef std::map&lt;size_t,block_not_in_use*&gt; free_list_t;</pre><p>　まあつまり、重複なしのマップデータ構造となりますが、すでに存在したら何もしないですし、存在するアドレスならデータ構造に挿入されます。</p><p>　まあいきなりなので補足しますね。</p><pre xmlns="" class="prettyprint"> 89   size_map_t M_size_map_;
+ 90   free_list_t M_free_list_;</pre><p>　この 2 つは以下のような定義になっています。</p><pre xmlns="" class="prettyprint"> 17   typedef std::map&lt;void*,size_t&gt; size_map_t;
  18   typedef std::map&lt;size_t,block_not_in_use*&gt; free_list_t;</pre><p>　free_list_t は各リクエストサイズごとにフリーチャンクのリスト（ block_no_in_use* ）をキープします。</p><p>　size_map_t は各フリーチャンクのリクエストサイズをキープします。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
 M_size_map_
 </span></dt><dd>
@@ -359,7 +363,7 @@ M_size_map_
 M_free_list_
 </span></dt><dd>
 各フリーチャンクに対してリクエストサイズを持つデータオブジェクト
-</dd></dl></div><p>　この 2 つのオブジェクトは一見不要に見えますが、必須です。</p><p>　これは allocate() 関数の宣言を見れば分かります。</p><pre class="programlisting"> 33   inline void* allocate(size_t n){</pre><p>　allocate() 関数はリクエスト個数（ n ） * ブロックサイズ( M_block_size_ )をリクエストサイズとするので、毎回リクエストサイズが同じとは限らないです。</p><p>　ということは解放したチャンクサイズはブロックサイズ 1 個分、ブロックサイズ 2 個分、ブロックサイズ 3 個分というように異なるサイズとなるために、フリーチャンクのサイズは一定せず変動します。</p><pre class="programlisting"> 33   inline void* allocate(size_t n){
+</dd></dl></div><p>　この 2 つのオブジェクトは一見不要に見えますが、必須です。</p><p>　これは allocate() 関数の宣言を見れば分かります。</p><pre xmlns="" class="prettyprint"> 33   inline void* allocate(size_t n){</pre><p>　allocate() 関数はリクエスト個数（ n ） * ブロックサイズ( M_block_size_ )をリクエストサイズとするので、毎回リクエストサイズが同じとは限らないです。</p><p>　ということは解放したチャンクサイズはブロックサイズ 1 個分、ブロックサイズ 2 個分、ブロックサイズ 3 個分というように異なるサイズとなるために、フリーチャンクのサイズは一定せず変動します。</p><pre xmlns="" class="prettyprint"> 33   inline void* allocate(size_t n){
  34     auto cache_head = M_free_list_[n*M_block_size_];
  35     void* pblock = pop_from_pool(cache_head,n);
  36     if(!pblock)
@@ -380,8 +384,8 @@ M_free_list_
  51       std::printf("reuse pointer %p for size %lu\n",pblock,n*M_block_size_);
  52     }
  53     return pblock;
- 54   }</pre><p>　allocate() 関数は必要以上に長いように見えますが、スタックの再利用を実装するならば、これぐらいの行数は普通に使います。</p><p>　まずはキャッシュの先頭を取得して、そのキャッシュヘッドから使えるフリーチャンクを取り出します。</p><pre class="programlisting"> 34     auto cache_head = M_free_list_[n*M_block_size_];
- 35     void* pblock = pop_from_pool(cache_head,n);</pre><p>　この際に pop_from_pool() にはリクエスト個数 n を指定していますね。</p><p>　これはキャッシュから「リクエスト個数（ n ） × ブロックサイズ( M_block_size_ )」のリクエストサイズに一致するフリーチャンクをポップするために必要な引数です。</p><p>　pblock が NULL 値でないのなら allocate() 関数は pblock をそのまま返します。</p><p>　それで pblock が NULL の場合の allocate() 関数の続きです。</p><pre class="programlisting"> 38       if(M_pool_index_ &lt;= M_max_objects_)
+ 54   }</pre><p>　allocate() 関数は必要以上に長いように見えますが、スタックの再利用を実装するならば、これぐらいの行数は普通に使います。</p><p>　まずはキャッシュの先頭を取得して、そのキャッシュヘッドから使えるフリーチャンクを取り出します。</p><pre xmlns="" class="prettyprint"> 34     auto cache_head = M_free_list_[n*M_block_size_];
+ 35     void* pblock = pop_from_pool(cache_head,n);</pre><p>　この際に pop_from_pool() にはリクエスト個数 n を指定していますね。</p><p>　これはキャッシュから「リクエスト個数（ n ） × ブロックサイズ( M_block_size_ )」のリクエストサイズに一致するフリーチャンクをポップするために必要な引数です。</p><p>　pblock が NULL 値でないのなら allocate() 関数は pblock をそのまま返します。</p><p>　それで pblock が NULL の場合の allocate() 関数の続きです。</p><pre xmlns="" class="prettyprint"> 38       if(M_pool_index_ &lt;= M_max_objects_)
  39       {
  40         std::cout &lt;&lt; "NEW! M_pool_index : M_block_in_use_ = " &lt;&lt; M_pool_index_
  41           &lt;&lt; " : " &lt;&lt; M_block_in_use_ &lt;&lt; '\n';
@@ -392,16 +396,16 @@ M_free_list_
  46         assert(false);
  47       }
  48       M_block_in_use_ += n;
- 49       M_size_map_[pblock] = n*M_block_size_;</pre><p>　pblock はメモリープールこと Mp_pool_ を起点にして「プールインデックス × ブロックサイズ」を加算した void ポインターアドレスを代入します。</p><pre class="programlisting"> 42         pblock = static_cast&lt;void*&gt;(Mp_pool_ + (M_pool_index_ * M_block_size_));</pre><p>　M_pool_index_ は「次に使用するブロック数」を意味します。</p><p>　M_pool_index_ は pblock に割り当てた時点で「使用中のブロック数」に意味を転じます。</p><p>　つまり使用中のブロック数とブロックサイズを乗じることで、次に割り当てたいブロックのアドレスを算出します。</p><p>　割り当てアドレスを算出後には以下のようにアップデートします。</p><pre class="programlisting"> 43         M_pool_index_ += n;</pre><p>　最後に割り当てたブロック情報のブックキーピングをしておきます。</p><pre class="programlisting"> 48       M_block_in_use_ += n;
- 49       M_size_map_[pblock] = n*M_block_size_;</pre><p>　M_block_in_use_ は使用中のブロック数で M_pool_index_ と同じ値となりますが、名前が紛らわしいので、もう一つ変数を保持することにしただけです。</p><p>　M_size_map_ の行は pblock のアドレスとリクエストサイズを紐付けるマップデータを設定していますね。</p><p>　最後に割り当て済みチャンクを解放する deallocate() 関数です。</p><pre class="programlisting"> 56   inline void deallocate(void* memory, size_t )
+ 49       M_size_map_[pblock] = n*M_block_size_;</pre><p>　pblock はメモリープールこと Mp_pool_ を起点にして「プールインデックス × ブロックサイズ」を加算した void ポインターアドレスを代入します。</p><pre xmlns="" class="prettyprint"> 42         pblock = static_cast&lt;void*&gt;(Mp_pool_ + (M_pool_index_ * M_block_size_));</pre><p>　M_pool_index_ は「次に使用するブロック数」を意味します。</p><p>　M_pool_index_ は pblock に割り当てた時点で「使用中のブロック数」に意味を転じます。</p><p>　つまり使用中のブロック数とブロックサイズを乗じることで、次に割り当てたいブロックのアドレスを算出します。</p><p>　割り当てアドレスを算出後には以下のようにアップデートします。</p><pre xmlns="" class="prettyprint"> 43         M_pool_index_ += n;</pre><p>　最後に割り当てたブロック情報のブックキーピングをしておきます。</p><pre xmlns="" class="prettyprint"> 48       M_block_in_use_ += n;
+ 49       M_size_map_[pblock] = n*M_block_size_;</pre><p>　M_block_in_use_ は使用中のブロック数で M_pool_index_ と同じ値となりますが、名前が紛らわしいので、もう一つ変数を保持することにしただけです。</p><p>　M_size_map_ の行は pblock のアドレスとリクエストサイズを紐付けるマップデータを設定していますね。</p><p>　最後に割り当て済みチャンクを解放する deallocate() 関数です。</p><pre xmlns="" class="prettyprint"> 56   inline void deallocate(void* memory, size_t )
  57   {
  58     auto chunk_size = M_size_map_[memory];
  59     if(chunk_size != 0){
  60       rewind(memory,chunk_size);
  61     }
- 62   }</pre><p>　最初にやるのは M_size_map_ から memory に一対のチャンクサイズを取得します。</p><pre class="programlisting"> 58     auto chunk_size = M_size_map_[memory];</pre><p>　次に該当するメモリーアドレスとチャンクサイズが存在するのであれば rewind() 関数をコールします。</p><pre class="programlisting"> 59     if(chunk_size != 0){
+ 62   }</pre><p>　最初にやるのは M_size_map_ から memory に一対のチャンクサイズを取得します。</p><pre xmlns="" class="prettyprint"> 58     auto chunk_size = M_size_map_[memory];</pre><p>　次に該当するメモリーアドレスとチャンクサイズが存在するのであれば rewind() 関数をコールします。</p><pre xmlns="" class="prettyprint"> 59     if(chunk_size != 0){
  60       rewind(memory,chunk_size);
- 61     }</pre><p>　これによってチャンクをフリーリストに登録して、メモリーを再利用のキャッシュとして使えるようにします。</p><p>　最後にテストコードもチェックしてみましょうかね。</p><pre class="programlisting">182 int main()
+ 61     }</pre><p>　これによってチャンクをフリーリストに登録して、メモリーを再利用のキャッシュとして使えるようにします。</p><p>　最後にテストコードもチェックしてみましょうかね。</p><pre xmlns="" class="prettyprint">182 int main()
 183 {
 184   int *ptr[10];
 185
@@ -427,7 +431,7 @@ M_free_list_
 205   for(int i = 1; i &lt; 5; ++i){
 206     ptr[i] = ba.allocate(2);
 207   }
-208 }</pre><p>　リクエストするオブジェクト数を 1 個と 2 個のケースでテストしていますね。</p><p>　オブジェクト数 1 個のケースでは 5 回割り当てた後に 4 回解放します。</p><p>　さらにその後に追加で 5 回割り当てをします。</p><pre class="programlisting">189   for(int i = 0; i &lt; 5; ++i){
+208 }</pre><p>　リクエストするオブジェクト数を 1 個と 2 個のケースでテストしていますね。</p><p>　オブジェクト数 1 個のケースでは 5 回割り当てた後に 4 回解放します。</p><p>　さらにその後に追加で 5 回割り当てをします。</p><pre xmlns="" class="prettyprint">189   for(int i = 0; i &lt; 5; ++i){
 190     ptr[i] = ba.allocate(1);
 191   }
 192   for(int i = 1; i &lt; 5; ++i){
@@ -435,7 +439,7 @@ M_free_list_
 194   }
 195   for(int i = 5; i &lt; 10; ++i){
 196     ptr[i] = ba.allocate(1);
-197   }</pre><p>　4 個分のフリーチャンクができるので、新規割り当て回数はこの場合は 6 回となりますね。</p><p>　これは出力を見ると分かるかと思います。</p><pre class="programlisting">size == 1
+197   }</pre><p>　4 個分のフリーチャンクができるので、新規割り当て回数はこの場合は 6 回となりますね。</p><p>　これは出力を見ると分かるかと思います。</p><pre xmlns="" class="prettyprint">size == 1
 NEW! M_pool_index : M_block_in_use_ = 0 : 0
 NEW! M_pool_index : M_block_in_use_ = 1 : 1
 NEW! M_pool_index : M_block_in_use_ = 2 : 2
@@ -449,7 +453,7 @@ reuse pointer 0x56354f80a1e8 for size 8
 reuse pointer 0x56354f80a1e0 for size 8
 reuse pointer 0x56354f80a1d8 for size 8
 reuse pointer 0x56354f80a1d0 for size 8
-NEW! M_pool_index : M_block_in_use_ = 5 : 5</pre><p>　オブジェクト数 2 個のケースでは 4 回割り当てた後に 4 回解放し、さらにもう一回割り当てします。</p><pre class="programlisting">199   for(int i = 1; i &lt; 5; ++i){
+NEW! M_pool_index : M_block_in_use_ = 5 : 5</pre><p>　オブジェクト数 2 個のケースでは 4 回割り当てた後に 4 回解放し、さらにもう一回割り当てします。</p><pre xmlns="" class="prettyprint">199   for(int i = 1; i &lt; 5; ++i){
 200     ptr[i] = ba.allocate(2);
 201   }
 202   for(int i = 1; i &lt; 5; ++i){
@@ -457,7 +461,7 @@ NEW! M_pool_index : M_block_in_use_ = 5 : 5</pre><p>　オブジェクト数 2 �
 204   }
 205   for(int i = 1; i &lt; 5; ++i){
 206     ptr[i] = ba.allocate(2);
-207   }</pre><p>　これも出力で正しく実装されていることが確認できます。</p><pre class="programlisting">size == 2
+207   }</pre><p>　これも出力で正しく実装されていることが確認できます。</p><pre xmlns="" class="prettyprint">size == 2
 NEW! M_pool_index : M_block_in_use_ = 6 : 6
 NEW! M_pool_index : M_block_in_use_ = 8 : 8
 NEW! M_pool_index : M_block_in_use_ = 10 : 10
@@ -469,7 +473,7 @@ rewind cache head 0x56354f80a228 for size 16
 reuse pointer 0x56354f80a228 for size 16
 reuse pointer 0x56354f80a218 for size 16
 reuse pointer 0x56354f80a208 for size 16
-reuse pointer 0x56354f80a1f8 for size 16</pre><p>　リクエストサイズは「ブロックサイズ × 2 = 16 バイト」になってますね。</p><p>　ただこのケースでは一定サイズを超えるとエラーを投げるようにしています。</p><pre class="programlisting"> 38       if(M_pool_index_ &lt;= M_max_objects_)
+reuse pointer 0x56354f80a1f8 for size 16</pre><p>　リクエストサイズは「ブロックサイズ × 2 = 16 バイト」になってますね。</p><p>　ただこのケースでは一定サイズを超えるとエラーを投げるようにしています。</p><pre xmlns="" class="prettyprint"> 38       if(M_pool_index_ &lt;= M_max_objects_)
  39       {
 
  //  中略
@@ -477,4 +481,4 @@ reuse pointer 0x56354f80a1f8 for size 16</pre><p>　リクエストサイズは�
  44       } else {
  45         std::cout &lt;&lt; "M_pool_index = " &lt;&lt; M_pool_index_ &lt;&lt; '\n';
  46         assert(false);
- 47       }</pre><p>　これを解決する方法は次に項目で解説したいと思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch88.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch88.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch89.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+ 47       }</pre><p>　これを解決する方法は次に項目で解説したいと思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch88.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch88.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch89.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

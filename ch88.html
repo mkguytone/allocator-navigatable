@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第88章 配列内のアドレスの走査</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt09.html" title="パート IX. スタック領域に割り当てるアロケーター" /><link rel="prev" href="pt09.html" title="パート IX. スタック領域に割り当てるアロケーター" /><link rel="next" href="ch88s01.html" title="88.1. スタックアロケーター（可変長のリクエストサイズに対応、難易度高いのでスキップ推奨）" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="pt09.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch88s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_配列内のアドレスの走査"></a>第88章 配列内のアドレスの走査</h2></div></div></div><p>　スタックアロケーターの解説を始める前に一つクリアにしときましょう。</p><p>　まずスタックは上位アドレスから下位アドレスに下方向に拡大していきます。</p><p><strong>main.cpp. </strong>
-</p><pre class="programlisting">  1 #include &lt;cstdio&gt;
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第88章 配列内のアドレスの走査</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt09.html" title="パート IX. スタック領域に割り当てるアロケーター" /><link rel="prev" href="pt09.html" title="パート IX. スタック領域に割り当てるアロケーター" /><link rel="next" href="ch88s01.html" title="88.1. スタックアロケーター（可変長のリクエストサイズに対応、難易度高いのでスキップ推奨）" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="pt09.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch88s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_配列内のアドレスの走査"></a>第88章 配列内のアドレスの走査</h2></div></div></div><p>　スタックアロケーターの解説を始める前に一つクリアにしときましょう。</p><p>　まずスタックは上位アドレスから下位アドレスに下方向に拡大していきます。</p><p><strong>main.cpp. </strong>
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;cstdio&gt;
   2
   3 void bar(){
   4   int a,b,c,d,e;
@@ -34,7 +38,7 @@
  32   return 0;
  33 }</pre><p>
 </p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp
 $ ./a.out
 a: 0x7fffd7fa7464
 b: 0x7fffd7fa7468
@@ -54,7 +58,7 @@ c: 0x7fffd7fa740c
 d: 0x7fffd7fa7410
 e: 0x7fffd7fa7414</pre><p>
 </p><p>　このコードを見ると関数内で宣言順で変数のアドレスをチェックすると 4 バイト間隔となっています。</p><p>　しかし関数をコールすると、アドレスは下方向にシフトします。</p><p>　例えば main 関数の a は 0x7fffd7fa7464 ですが foo 関数の a は 0x7fffd7fa7434 というように値が減少しています。</p><p>　まあこんな感じで変数の宣言順というのはわかったのですが、アロケーターにとっては配列型のアドレス構造の方を知りたいです。</p><p>　では配列内のアドレスはどうなのか確かめて見ましょう。</p><p><strong>main.cpp. </strong>
-</p><pre class="programlisting">  1 #include &lt;cstdio&gt;
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;cstdio&gt;
   2
   3 int main()
   4 {
@@ -68,7 +72,7 @@ e: 0x7fffd7fa7414</pre><p>
  12   return 0;
  13 }</pre><p>
 </p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp
 $ ./a.out
 0x7ffca911c040
 0x7ffca911c044
@@ -80,4 +84,4 @@ $ ./a.out
 0x7ffca911c05c
 0x7ffca911c060
 0x7ffca911c064</pre><p>
-</p><p>　これは文句なく上方向に動いていますね。</p><p>　0x7ffca911c040 から 0x7ffca911c064 だと一目瞭然です。</p><p>　つまりスタックにおいては、一旦宣言・定義した配列・変数のアドレスは減算でなく加算されるってことです。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pt09.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt09.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch88s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+</p><p>　これは文句なく上方向に動いていますね。</p><p>　0x7ffca911c040 から 0x7ffca911c064 だと一目瞭然です。</p><p>　つまりスタックにおいては、一旦宣言・定義した配列・変数のアドレスは減算でなく加算されるってことです。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pt09.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt09.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch88s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

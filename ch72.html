@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第72章 stat 構造体</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt05.html" title="パート V. Linux カーネルのメモリーとファイルシステム" /><link rel="prev" href="ch71s06.html" title="71.6. file (カーネル)" /><link rel="next" href="pt06.html" title="パート VI. mmap" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch71s06.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt06.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_stat_構造体"></a>第72章 stat 構造体</h2></div></div></div><p>　stat 構造体はファイルの情報を取得するための関数の引数として使用されます。</p><p>　まあステータス情報を保持するためのオブジェクトぐらいに考えておけば結構です。</p><p>　構造体の中身を見るまえにスターテスを取得する関数の宣言です。</p><pre class="programlisting">#include &lt;sys/types.h&gt;
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第72章 stat 構造体</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt05.html" title="パート V. Linux カーネルのメモリーとファイルシステム" /><link rel="prev" href="ch71s06.html" title="71.6. file (カーネル)" /><link rel="next" href="pt06.html" title="パート VI. mmap" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch71s06.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt06.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_stat_構造体"></a>第72章 stat 構造体</h2></div></div></div><p>　stat 構造体はファイルの情報を取得するための関数の引数として使用されます。</p><p>　まあステータス情報を保持するためのオブジェクトぐらいに考えておけば結構です。</p><p>　構造体の中身を見るまえにスターテスを取得する関数の宣言です。</p><pre xmlns="" class="prettyprint">#include &lt;sys/types.h&gt;
 #include &lt;sys/stat.h&gt;
 #include &lt;unistd.h&gt;
 
 int stat(const char *pathname, struct stat *statbuf);
 int fstat(int fd, struct stat *statbuf);
-int lstat(const char *pathname, struct stat *statbuf);</pre><p>　stat は pathname で指定したファイルの情報を statbuf に更新します。</p><p>　fstat はファイル記述子 fd で指定したファイルの情報を statbuf に更新します。</p><p>　lstat は pathname がシンボリックリンクならば、リンクが指すファイルでなく、リンクの情報を返します。</p><p>　次は構造体の宣言・定義を見てみましょう。</p><pre class="programlisting">struct stat {
+int lstat(const char *pathname, struct stat *statbuf);</pre><p>　stat は pathname で指定したファイルの情報を statbuf に更新します。</p><p>　fstat はファイル記述子 fd で指定したファイルの情報を statbuf に更新します。</p><p>　lstat は pathname がシンボリックリンクならば、リンクが指すファイルでなく、リンクの情報を返します。</p><p>　次は構造体の宣言・定義を見てみましょう。</p><pre xmlns="" class="prettyprint">struct stat {
     dev_t     st_dev;         /* ID of device containing file */
     ino_t     st_ino;         /* Inode number */
     mode_t    st_mode;        /* File type and mode */
@@ -29,7 +33,7 @@ int lstat(const char *pathname, struct stat *statbuf);</pre><p>　stat は pathn
 #define st_mtime st_mtim.tv_sec
 #define st_ctime st_ctim.tv_sec
 };</pre><p>　まあ情報量が多いので、全部は説明しませんがユーザーID、グループID、inode番号、ブロックサイズ、ブロック数などの情報を取得できます。</p><p>　ではファイル情報の取得をするちょっとしたコードを書いて見ましょう。</p><p><strong>main.c. </strong>
-</p><pre class="programlisting">  1 #include &lt;stdio.h&gt;
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;stdio.h&gt;
   2 #include &lt;sys/stat.h&gt;
   3 #include &lt;sys/types.h&gt;
   4 #include &lt;unistd.h&gt;
@@ -86,7 +90,7 @@ int lstat(const char *pathname, struct stat *statbuf);</pre><p>　stat は pathn
  55   return 0;
  56 }</pre><p>
 </p><p><strong>ビルドと実行の結果. </strong>
-</p><pre class="programlisting">$ gcc main.c
+</p><pre xmlns="" class="prettyprint">$ gcc main.c
 $ ./a.out
 st_size       = 16
 st_blksize    = 4096
@@ -95,7 +99,7 @@ st_ino        = 55452023
 st_gid        = 1000
 st_uid        = 1000
 file</pre><p>
-</p><p>　このソースコードは mm_file というファイルを生成または開いてから buf の中身を書き込み、ファイル情報をチェックしています。</p><pre class="programlisting"> 12   int fd;
+</p><p>　このソースコードは mm_file というファイルを生成または開いてから buf の中身を書き込み、ファイル情報をチェックしています。</p><pre xmlns="" class="prettyprint"> 12   int fd;
  13   struct stat sb;
  14   char buf[BUFSIZE];
  15
@@ -108,6 +112,6 @@ file</pre><p>
  22   if(fstat(fd,&amp;sb)==-1){
  23     perror("fstatに失敗");
  24     exit(1);
- 25   }</pre><p>　st_size はファイルサイズですね。</p><p>　buf のサイズが 16 バイトですんで、そのままの値です。</p><p>　st_blksize は 4KB です。</p><p>　st_blocks は 512 バイトのブロック数なので 8 個あります。</p><p>　この場合は 4KB が 512B の 8 個分ということになります。</p><p>　st_ino は inode 番号です。</p><p>　st_gid と st_uid は両方とも 1000 です。</p><p>　最後に st_mode は S_IFREG にマッチしています。</p><pre class="programlisting"> 33   switch(sb.st_mode &amp; S_IFMT) {
+ 25   }</pre><p>　st_size はファイルサイズですね。</p><p>　buf のサイズが 16 バイトですんで、そのままの値です。</p><p>　st_blksize は 4KB です。</p><p>　st_blocks は 512 バイトのブロック数なので 8 個あります。</p><p>　この場合は 4KB が 512B の 8 個分ということになります。</p><p>　st_ino は inode 番号です。</p><p>　st_gid と st_uid は両方とも 1000 です。</p><p>　最後に st_mode は S_IFREG にマッチしています。</p><pre xmlns="" class="prettyprint"> 33   switch(sb.st_mode &amp; S_IFMT) {
  34     case S_IFREG:
- 35       printf("file\n");</pre><p>　まあリンクとかでなく普通のファイルって意味です。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch71s06.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt05.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="pt06.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+ 35       printf("file\n");</pre><p>　まあリンクとかでなく普通のファイルって意味です。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch71s06.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt05.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="pt06.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

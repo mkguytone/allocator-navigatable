@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第96章 アロケータークラス内での複数の割り当て方針を切り替え</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt11.html" title="パート XI. アロケーターをセレクターで切り替え" /><link rel="prev" href="pt11.html" title="パート XI. アロケーターをセレクターで切り替え" /><link rel="next" href="ch96s01.html" title="96.1. 複数のアロケーターインスタンスを切り替え" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="pt11.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch96s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_アロケータークラス内での複数の割り当て方針を切り替え"></a>第96章 アロケータークラス内での複数の割り当て方針を切り替え</h2></div></div></div><p>アロケータークラス内での複数の割り当て方針を切り替えですが、メモリープールを複数のブロックサイズで持っておくと簡単に作れます。</p><p>例えば以下のようなクラスです。</p><pre class="programlisting"> 13 class allocator
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第96章 アロケータークラス内での複数の割り当て方針を切り替え</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt11.html" title="パート XI. アロケーターをセレクターで切り替え" /><link rel="prev" href="pt11.html" title="パート XI. アロケーターをセレクターで切り替え" /><link rel="next" href="ch96s01.html" title="96.1. 複数のアロケーターインスタンスを切り替え" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="pt11.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch96s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_アロケータークラス内での複数の割り当て方針を切り替え"></a>第96章 アロケータークラス内での複数の割り当て方針を切り替え</h2></div></div></div><p>アロケータークラス内での複数の割り当て方針を切り替えですが、メモリープールを複数のブロックサイズで持っておくと簡単に作れます。</p><p>例えば以下のようなクラスです。</p><pre xmlns="" class="prettyprint"> 13 class allocator
  14 {
  15 public:
  16
@@ -24,11 +28,11 @@
 111   std::byte Mp_Mem16_[sizeof(std::byte[16])*MAX_OBJECTS];
 112   std::byte Mp_Mem32_[sizeof(std::byte[32])*MAX_OBJECTS];
 113   std::byte Mp_Mem64_[sizeof(std::byte[64])*MAX_OBJECTS];
-114 };</pre><p>Mp_pool_ がメモリープールとなり、各メモリープールのサイズはストレージ変数で持つことになります。</p><p>例えば Mp_mem8_ は 8 バイト均等のブロックサイズで、 Mp_mem16_ は 16 バイト均等のブロックサイズの記憶領域となります。</p><p>後は placement new (配置 new )でメモリープールにアドレスを代入していってますね。</p><pre class="programlisting"> 21     Mp_pool_[0] = ::new (&amp;Mp_Mem8_)  std::byte[sizeof(std::byte[8])*MAX_OBJECTS];
+114 };</pre><p>Mp_pool_ がメモリープールとなり、各メモリープールのサイズはストレージ変数で持つことになります。</p><p>例えば Mp_mem8_ は 8 バイト均等のブロックサイズで、 Mp_mem16_ は 16 バイト均等のブロックサイズの記憶領域となります。</p><p>後は placement new (配置 new )でメモリープールにアドレスを代入していってますね。</p><pre xmlns="" class="prettyprint"> 21     Mp_pool_[0] = ::new (&amp;Mp_Mem8_)  std::byte[sizeof(std::byte[8])*MAX_OBJECTS];
  22     Mp_pool_[1] = ::new (&amp;Mp_Mem16_) std::byte[sizeof(std::byte[16])*MAX_OBJECTS];
  23     Mp_pool_[2] = ::new (&amp;Mp_Mem32_) std::byte[sizeof(std::byte[32])*MAX_OBJECTS];
  24     Mp_pool_[3] = ::new (&amp;Mp_Mem64_) std::byte[sizeof(std::byte[64])*MAX_OBJECTS];</pre><p>こんな感じで、メモリープールが 4 個併存するような設計にして、それをクラスの内部実装で切り替えますが、詳細はフルのソースコードで解説したいと思います。</p><p><strong>main.cpp. </strong>
-</p><pre class="programlisting">  1 #include &lt;cstddef&gt;
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;cstddef&gt;
   2 #include &lt;memory&gt;
   3 #include &lt;cassert&gt;
   4 #include &lt;new&gt;
@@ -334,7 +338,7 @@
 304   }
 305 }</pre><p>
 </p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp -std=c++17
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp -std=c++17
 $ ./a.out
 M_pool_index : M_block_in_use_ = 1 : 0
 object size / block size = 4/8
@@ -386,7 +390,7 @@ class block_delete
 allocate_block() 関数
 </span></dt><dd>
 アロケータークラスでメモリー割り当てをしたポインターをスマートポインターにして返します
-</dd></dl></div><p>メインのロジックを実装しているのが class allocator となります。</p><p>block_allocator クラスはマネージャークラスという聞き慣れない表現だと思いますが、allocator オブジェクトを保持する以外の機能と、アロケーター要件を満たす機能ぐらいしかなく、中身は基本的に空っぽです。</p><p>注目すべき点としては、以下のようにアロケーターのスタティックインスタンスを持ってることです。</p><pre class="programlisting">118 template&lt;typename T&gt;
+</dd></dl></div><p>メインのロジックを実装しているのが class allocator となります。</p><p>block_allocator クラスはマネージャークラスという聞き慣れない表現だと思いますが、allocator オブジェクトを保持する以外の機能と、アロケーター要件を満たす機能ぐらいしかなく、中身は基本的に空っぽです。</p><p>注目すべき点としては、以下のようにアロケーターのスタティックインスタンスを持ってることです。</p><pre xmlns="" class="prettyprint">118 template&lt;typename T&gt;
 119 class block_allocator
 120 {
 //中略
@@ -395,7 +399,7 @@ allocate_block() 関数
 155 };
 156
 157 template&lt;typename T&gt;
-158 allocator block_allocator&lt;T&gt;::S_alloc_;</pre><p>S_alloc_ はポインターでなく実体オブジェクトのために強くバインドされてしまいますが、アロケーターは一つという場合では支障はないですかね。</p><p>S_alloc_ は allocate() と deallocate() 関数の実装に使います。</p><pre class="programlisting">143   T* allocate(std::size_t n)
+158 allocator block_allocator&lt;T&gt;::S_alloc_;</pre><p>S_alloc_ はポインターでなく実体オブジェクトのために強くバインドされてしまいますが、アロケーターは一つという場合では支障はないですかね。</p><p>S_alloc_ は allocate() と deallocate() 関数の実装に使います。</p><pre xmlns="" class="prettyprint">143   T* allocate(std::size_t n)
 144   {
 145     return reinterpret_cast&lt;T*&gt;(S_alloc_.allocate(n));
 146   }
@@ -403,4 +407,4 @@ allocate_block() 関数
 148   void deallocate(T* p,size_t n)
 149   {
 150     S_alloc_.deallocate(static_cast&lt;void*&gt;(p),n);
-151   }</pre><p>block_delete クラステンプレートや allocate_block() 関数については慣用表現とまでは言いませんが、スマートポインターを作るためのヘルパークラスと関数と考えてもらえばと思います。</p><p>allocate_block() の詳細については前の章を参照してください。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pt11.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt11.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch96s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+151   }</pre><p>block_delete クラステンプレートや allocate_block() 関数については慣用表現とまでは言いませんが、スマートポインターを作るためのヘルパークラスと関数と考えてもらえばと思います。</p><p>allocate_block() の詳細については前の章を参照してください。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pt11.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt11.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch96s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

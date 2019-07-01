@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第90章 コードをシンプルにする（内部バッファーのアドレスかのチェック）</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt09.html" title="パート IX. スタック領域に割り当てるアロケーター" /><link rel="prev" href="ch89.html" title="第89章 ヒープへのフォールバック付きスタックアロケーター" /><link rel="next" href="pt10.html" title="パート X. ヒープ領域のアドレスに割り当て" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch89.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt10.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_コードをシンプルにする_内部バッファーのアドレスかのチェック"></a>第90章 コードをシンプルにする（内部バッファーのアドレスかのチェック）</h2></div></div></div><p>　スタック領域にメモリーを解放する場合は、ポインターが内部バッファーにあるかのチェックが必要な場合があります。</p><p>　例えば以下のようなケースですかね。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第90章 コードをシンプルにする（内部バッファーのアドレスかのチェック）</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt09.html" title="パート IX. スタック領域に割り当てるアロケーター" /><link rel="prev" href="ch89.html" title="第89章 ヒープへのフォールバック付きスタックアロケーター" /><link rel="next" href="pt10.html" title="パート X. ヒープ領域のアドレスに割り当て" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch89.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt10.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_コードをシンプルにする_内部バッファーのアドレスかのチェック"></a>第90章 コードをシンプルにする（内部バッファーのアドレスかのチェック）</h2></div></div></div><p>　スタック領域にメモリーを解放する場合は、ポインターが内部バッファーにあるかのチェックが必要な場合があります。</p><p>　例えば以下のようなケースですかね。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 定義したスタック領域のサイズが足りない時にヒープ領域にフォールバックする
 </li><li class="listitem">
 STLへのアロケーターを作ったリザーブ（予約）したアドレス領域を超えた割当やアクセスが定義されていない
-</li></ul></div><p>　前の項目の例では、力技で乗り切った部分がありましたが、実際</p><p>　この基準にあうのであれば、アドレス領域がスタック領域内で定義した内部バッファーにアドレスがあるかチェックするようにしたほうが良いです。</p><p>　さらにフォールバックを行うには std::allocator&lt;T&gt; を使えるようにしたいです。</p><p>　内部バッファーのアドレスかのチェックは、かなり定型化しているのですが、以下のようになるかと思います。</p><pre class="programlisting">147   bool internal_buffer(const_pointer p) const
+</li></ul></div><p>　前の項目の例では、力技で乗り切った部分がありましたが、実際</p><p>　この基準にあうのであれば、アドレス領域がスタック領域内で定義した内部バッファーにアドレスがあるかチェックするようにしたほうが良いです。</p><p>　さらにフォールバックを行うには std::allocator&lt;T&gt; を使えるようにしたいです。</p><p>　内部バッファーのアドレスかのチェックは、かなり定型化しているのですが、以下のようになるかと思います。</p><pre xmlns="" class="prettyprint">147   bool internal_buffer(const_pointer p) const
 148   {
 149     return ((const_pointer)M_begin_ &lt;= p &amp;&amp; p &lt;= (const_pointer)M_end_);
 150   }</pre><p>　この internal_buffer() 関数がやってるのはポインター p が M_begin_ と M_end_ の範囲内にあるかというチェックです。</p><p>　そして、もしこの internal_buffer() の返す値が偽ならば、 std::allocator&lt;T&gt; へフォールバックするというのが一般的な実装方法かと思いまする。</p><p>　ではサンプルコードを見てみましょう。</p><p><strong>main.cpp. </strong>
-</p><pre class="programlisting">  1 #include &lt;memory&gt;
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;memory&gt;
   2 #include &lt;vector&gt;
   3 #include &lt;iostream&gt;
   4 #include &lt;cassert&gt;
@@ -216,7 +220,7 @@ STLへのアロケーターを作ったリザーブ（予約）したアドレ�
 207   return 0;
 208 }</pre><p>
 </p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp -std=c++17
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp -std=c++17
 $ ./a.out
 allocate on the stack
 internal buffer construct
@@ -253,7 +257,7 @@ deallocate on the heap
 deallocate on the heap
 deallocate on the heap
 deallocate on the stack</pre><p>
-</p><p>　まずはクラス内のメンバー型とメンバーオブジェクト・変数から見ていきましょう。</p><pre class="programlisting">  8 template&lt;typename T, std::size_t N, typename Allocator = std::allocator&lt;T&gt;&gt;
+</p><p>　まずはクラス内のメンバー型とメンバーオブジェクト・変数から見ていきましょう。</p><pre xmlns="" class="prettyprint">  8 template&lt;typename T, std::size_t N, typename Allocator = std::allocator&lt;T&gt;&gt;
   9 class stack_allocator
  10 {
  11 public:
@@ -285,14 +289,14 @@ deallocate on the stack</pre><p>
 159   byte* M_begin_;
 160   byte* M_end_;
 161   byte* M_stack_pointer_;
-162 };</pre><p>　この中で内部バッファーの範囲を定義するのは M_begin_ と M_end_ です。</p><p>　後は M_buffer_ がベースとなるデータを保管してくれるスタック領域のバッファーです。</p><pre class="programlisting"> 28   explicit stack_allocator(const allocator_type&amp; alloc = allocator_type())
+162 };</pre><p>　この中で内部バッファーの範囲を定義するのは M_begin_ と M_end_ です。</p><p>　後は M_buffer_ がベースとなるデータを保管してくれるスタック領域のバッファーです。</p><pre xmlns="" class="prettyprint"> 28   explicit stack_allocator(const allocator_type&amp; alloc = allocator_type())
  29     : M_allocator_(alloc),
  30     M_block_size_(sizeof(T) &lt; 8 ? sizeof(long long) : sizeof(T)),
  31     M_max_objects_(N),
  32     M_begin_(M_buffer_),
  33     M_end_(M_buffer_+M_block_size_*M_max_objects_),
  34     M_stack_pointer_(M_buffer_)
- 35   {}</pre><p>　コンストラクターでは M_begin_ を M_buffer_ に設定しています。</p><p>　まあ M_buffer_ はスタックバッファーの開始アドレスを指すポインターなので、これが開始点となるのはご依存ないですよね？</p><p>　次に M_end_ には 「 M_buffer_+M_block_size_*M_max_objects_ 」が代入されます。</p><p>　まあこれも M_buffer_ に M_buffer_ のバイトサイズを加算しているので、終端を指すポインターになるだけです。</p><p>　この内部バッファーチェックを使っている箇所が以下の deallocate() 関数です。</p><pre class="programlisting"> 73   void deallocate(pointer p, size_type n)
+ 35   {}</pre><p>　コンストラクターでは M_begin_ を M_buffer_ に設定しています。</p><p>　まあ M_buffer_ はスタックバッファーの開始アドレスを指すポインターなので、これが開始点となるのはご依存ないですよね？</p><p>　次に M_end_ には 「 M_buffer_+M_block_size_*M_max_objects_ 」が代入されます。</p><p>　まあこれも M_buffer_ に M_buffer_ のバイトサイズを加算しているので、終端を指すポインターになるだけです。</p><p>　この内部バッファーチェックを使っている箇所が以下の deallocate() 関数です。</p><pre xmlns="" class="prettyprint"> 73   void deallocate(pointer p, size_type n)
  74   {
  75     auto chunk_size = M_size_map_[(void*)p];
  76     if(internal_buffer(p) || chunk_size != 0)
@@ -303,4 +307,4 @@ deallocate on the stack</pre><p>
  81       M_allocator_.deallocate(p,n);
  82       std::cout &lt;&lt; "deallocate on the heap" &lt;&lt; '\n';
  83     }
- 84   }</pre><p>　p が内部バッファーにないか、フリーチャンクが存在しない場合は標準アロケーターにフォールバックしていますね。</p><p>　まあ、こんな感じで内部バッファーのチェックを行うと良いかと思います。</p><p>　筆者は時間が無かったのと、説明するときのコードはキレイよりベタな方が良さそうという、その場のノリで、あまりチェックはしていないです。</p><p>　まあそれと、書くのも時間かかりますんでご理解賜りたいものです…　(´・ω・｀)</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch89.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt09.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="pt10.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+ 84   }</pre><p>　p が内部バッファーにないか、フリーチャンクが存在しない場合は標準アロケーターにフォールバックしていますね。</p><p>　まあ、こんな感じで内部バッファーのチェックを行うと良いかと思います。</p><p>　筆者は時間が無かったのと、説明するときのコードはキレイよりベタな方が良さそうという、その場のノリで、あまりチェックはしていないです。</p><p>　まあそれと、書くのも時間かかりますんでご理解賜りたいものです…　(´・ω・｀)</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch89.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt09.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="pt10.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

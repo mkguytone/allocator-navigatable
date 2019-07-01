@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第34章 malloc_par</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch33.html" title="第33章 最少チャンクサイズと最少割り当てサイズ" /><link rel="next" href="ch35.html" title="第35章 top チャンク" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch33.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch35.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_malloc_par"></a>第34章 malloc_par</h2></div></div></div><p>　malloc_par オブジェクトは malloc の環境変数的な情報を保有します。</p><p>　コーディングをキレイにするために作られた環境オブジェクトというのが筆者の理解です。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
-</p><pre class="programlisting">1718 struct malloc_par
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第34章 malloc_par</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch33.html" title="第33章 最少チャンクサイズと最少割り当てサイズ" /><link rel="next" href="ch35.html" title="第35章 top チャンク" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch33.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch35.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_malloc_par"></a>第34章 malloc_par</h2></div></div></div><p>　malloc_par オブジェクトは malloc の環境変数的な情報を保有します。</p><p>　コーディングをキレイにするために作られた環境オブジェクトというのが筆者の理解です。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre xmlns="" class="prettyprint">1718 struct malloc_par
 1719 {
 1720   /* Tunable parameters */
 1721   unsigned long trim_threshold;
@@ -37,9 +41,9 @@
 1752 #endif
 1753 };</pre><p>
 </p><p>　この malloc_par は「 malloc parameters 」ということですがインスタンスは 1 つだけらしいですね。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
-</p><pre class="programlisting">1781 /* There is only one instance of the malloc parameters.  */</pre><p>
+</p><pre xmlns="" class="prettyprint">1781 /* There is only one instance of the malloc parameters.  */</pre><p>
 </p><p>　てな感じでソースコードにもコメントがあります。</p><p>　具体的にはスタティックオブジェクトである「 mp_ 」が定義されてますね。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
-</p><pre class="programlisting">1783 static struct malloc_par mp_ =
+</p><pre xmlns="" class="prettyprint">1783 static struct malloc_par mp_ =
 1784 {
 1785   .top_pad = DEFAULT_TOP_PAD,
 1786   .n_mmaps_max = DEFAULT_MMAP_MAX,
@@ -60,10 +64,10 @@ mp_
 </span></dt><dd>
 malloc_par 型のスタティックオブジェクトです。
 </dd></dl></div><p>　もちろん main_arena と同様に gdb でもチェックはできます。</p><p>　例えば何もない空っぽのソースコードを使ってみたいと思います。</p><p><strong>empty.c. </strong>
-</p><pre class="programlisting">  1 int main(){
+</p><pre xmlns="" class="prettyprint">  1 int main(){
   2   return 0;
   3 }</pre><p>
-</p><p>　これをビルドしてデバッグすると以下のように mp_ のチェックができます。</p><pre class="programlisting">$ gcc empty.c -g
+</p><p>　これをビルドしてデバッグすると以下のように mp_ のチェックができます。</p><pre xmlns="" class="prettyprint">$ gcc empty.c -g
 $ gdb ./a.out
 (gdb) break main
 (gdb) run
@@ -72,4 +76,4 @@ Breakpoint 1, main () at empty.c:2
 (gdb) p mp_
 $3 = {trim_threshold = 131072, top_pad = 131072, mmap_threshold = 131072, arena_test = 8, arena_max = 0, n_mmaps = 0, n_mmaps_max = 65536,
   max_n_mmaps = 0, no_dyn_threshold = 0, mmapped_mem = 0, max_mmapped_mem = 0, sbrk_base = 0x0, tcache_bins = 64, tcache_max_bytes = 1032,
-  tcache_count = 7, tcache_unsorted_limit = 0}</pre><p>　ちなみに tcache というスタティックオブジェクトも存在しますが tcache のデバッグについてはスレッドを使ったプログラムでないと有効になりません。</p><p>　tcache については執筆時点ではまだ納得のいく理解には至ってませんが tcache_count は保有できるチャンクの最大数というのが筆者の見解です。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch33.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch35.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+  tcache_count = 7, tcache_unsorted_limit = 0}</pre><p>　ちなみに tcache というスタティックオブジェクトも存在しますが tcache のデバッグについてはスレッドを使ったプログラムでないと有効になりません。</p><p>　tcache については執筆時点ではまだ納得のいく理解には至ってませんが tcache_count は保有できるチャンクの最大数というのが筆者の見解です。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch33.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch35.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

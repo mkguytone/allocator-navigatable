@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>54.5. 複数のアラインメントでの検証</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch54.html" title="第54章 posix_memalign() / aligned_alloc()" /><link rel="prev" href="ch54s04.html" title="54.4. 大きめのアラインメント" /><link rel="next" href="ch55.html" title="第55章 std::launder ( C++17 )" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch54s04.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch55.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_複数のアラインメントでの検証"></a>54.5. 複数のアラインメントでの検証</h2></div></div></div><p>　アラインメントを理解するのであれば、一度は複数のアラインメント値でメモリー割り当てをしてみることだと思います。</p><p>　筆者も実際にプログラムを動かしたアラインメントを分析するだけで、理解が深まったと感じますし、確信が持てない時は実際にコードしてみるのが一番です。</p><p><strong>main.c. </strong>
-</p><pre class="programlisting">  1 #include &lt;stdlib.h&gt;
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>54.5. 複数のアラインメントでの検証</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch54.html" title="第54章 posix_memalign() / aligned_alloc()" /><link rel="prev" href="ch54s04.html" title="54.4. 大きめのアラインメント" /><link rel="next" href="ch55.html" title="第55章 std::launder ( C++17 )" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch54s04.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch55.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_複数のアラインメントでの検証"></a>54.5. 複数のアラインメントでの検証</h2></div></div></div><p>　アラインメントを理解するのであれば、一度は複数のアラインメント値でメモリー割り当てをしてみることだと思います。</p><p>　筆者も実際にプログラムを動かしたアラインメントを分析するだけで、理解が深まったと感じますし、確信が持てない時は実際にコードしてみるのが一番です。</p><p><strong>main.c. </strong>
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;stdlib.h&gt;
   2 #include &lt;stdio.h&gt;
   3
   4 int main()
@@ -26,7 +30,7 @@
  24   }
  25 }</pre><p>
 </p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ gcc main.c
+</p><pre xmlns="" class="prettyprint">$ gcc main.c
 $ ./a.out
 8: 0x56283798d260
 8: 0x56283798d690
@@ -64,11 +68,11 @@ $ ./a.out
 256: 0x56283798e500
 256: 0x56283798e600
 ========</pre><p>
-</p><p>　このサンプルでは 5 回のループをするための配列 ptr とアラインメント変数 alignment を宣言しておきます。</p><pre class="programlisting">  6   int *ptr[5];
-  7   int i,alignment,ret;</pre><p>　各ループで alignment を 2 乗にアプデートしていきます。</p><pre class="programlisting">  8   for(alignment = 8; alignment &lt; 512; alignment &lt;&lt;= 1) {
+</p><p>　このサンプルでは 5 回のループをするための配列 ptr とアラインメント変数 alignment を宣言しておきます。</p><pre xmlns="" class="prettyprint">  6   int *ptr[5];
+  7   int i,alignment,ret;</pre><p>　各ループで alignment を 2 乗にアプデートしていきます。</p><pre xmlns="" class="prettyprint">  8   for(alignment = 8; alignment &lt; 512; alignment &lt;&lt;= 1) {
   9     for(i = 0; i &lt; 5; i++)
- 10     {</pre><p>　これによって 5 個のアラインメントのパターンをテストします。</p><p>　メモリー割り当ての行は以下の箇所です。</p><pre class="programlisting"> 11       ret = posix_memalign((void**)(&amp;ptr[i]),alignment,sizeof(int));</pre><p>　この場合は ptr の指す int 型のサイズをベースに、色々なアラインメントをテストしています。</p><p>　例えば以下のアラインメントは 256 バイトです。</p><pre class="programlisting">256: 0x56283798e100
+ 10     {</pre><p>　これによって 5 個のアラインメントのパターンをテストします。</p><p>　メモリー割り当ての行は以下の箇所です。</p><pre xmlns="" class="prettyprint"> 11       ret = posix_memalign((void**)(&amp;ptr[i]),alignment,sizeof(int));</pre><p>　この場合は ptr の指す int 型のサイズをベースに、色々なアラインメントをテストしています。</p><p>　例えば以下のアラインメントは 256 バイトです。</p><pre xmlns="" class="prettyprint">256: 0x56283798e100
 256: 0x56283798e200
 256: 0x56283798e300
 256: 0x56283798e500
-256: 0x56283798e600</pre><p>　下 2 桁が 0 なので正しいアドレスにアラインされてますね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch54s04.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch54.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch55.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+256: 0x56283798e600</pre><p>　下 2 桁が 0 なので正しいアドレスにアラインされてますね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch54s04.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch54.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch55.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>49.1. _int_malloc() 関数</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch49.html" title="第49章 malloc() の実装" /><link rel="prev" href="ch49.html" title="第49章 malloc() の実装" /><link rel="next" href="ch50.html" title="第50章 free() の実装" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch49.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch50.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_int_malloc_関数"></a>49.1. _int_malloc() 関数</h2></div></div></div><div class="note" style="margin-left: 0; margin-right: 10%;"><h3 class="title">注記</h3><p>malloc コードを読みたい変わり者向けの項目です。正直なところ、暇のある人にしかお薦めできないので、普通に読みた方はスキップした方が良いと思いますぅ…　まる　(´・ω・｀)</p></div><p>　_int_malloc() 関数さえ理解できれば malloc() の理解も出来るといえるでしょう。</p><p>　読むのはガチにむっちゃ大変ですぞ…</p><p>　(´・ω・｀)</p><p>　まあ一行づつ読み解くのは難しいですが、おおまかにどの箇所がどの処理をしているくらいの説明はやってみたいと思いまする…</p><p>　(´・ω・｀)</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
-</p><pre class="programlisting">3515 /*
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>49.1. _int_malloc() 関数</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch49.html" title="第49章 malloc() の実装" /><link rel="prev" href="ch49.html" title="第49章 malloc() の実装" /><link rel="next" href="ch50.html" title="第50章 free() の実装" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch49.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch50.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_int_malloc_関数"></a>49.1. _int_malloc() 関数</h2></div></div></div><div class="note" style="margin-left: 0; margin-right: 10%;"><h3 class="title">注記</h3><p>malloc コードを読みたい変わり者向けの項目です。正直なところ、暇のある人にしかお薦めできないので、普通に読みた方はスキップした方が良いと思いますぅ…　まる　(´・ω・｀)</p></div><p>_int_malloc() 関数さえ理解できれば malloc() の理解も出来るといえるでしょう。</p><p>読むのはガチにむっちゃ大変ですぞ…</p><p>(´・ω・｀)</p><p>まあ一行づつ読み解くのは難しいですが、おおまかにどの箇所がどの処理をしているくらいの説明はやってみたいと思いまする…</p><p>(´・ω・｀)</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><pre xmlns="" class="prettyprint">3515 /*
 3516    ------------------------------ malloc ------------------------------
 3517  */
 3518
@@ -40,7 +44,7 @@
 3552
 3553   checked_request2size (bytes, nb);
 3554</pre><p>
-</p><p>　bytes のアラインメントを取ります。</p><pre class="programlisting">3555   /* There are no usable arenas.  Fall back to sysmalloc to get a chunk from
+</p><p>bytes のアラインメントを取ります。</p><pre xmlns="" class="prettyprint">3555   /* There are no usable arenas.  Fall back to sysmalloc to get a chunk from
 3556      mmap.  */
 3557   if (__glibc_unlikely (av == NULL))
 3558     {
@@ -49,7 +53,7 @@
 3561   alloc_perturb (p, bytes);
 3562       return p;
 3563     }
-3564</pre><p>　av が NULL かチェックします。</p><p>　もし av が NULL なら symalloc() 関数をコールします。</p><p>　sysmalloc() の割り当てが成功したら alloc_perturb() を呼び出してポインターを返します。</p><pre class="programlisting">3565   /*
+3564</pre><p>av が NULL かチェックします。</p><p>もし av が NULL なら symalloc() 関数をコールします。</p><p>sysmalloc() の割り当てが成功したら alloc_perturb() を呼び出してポインターを返します。</p><pre xmlns="" class="prettyprint">3565   /*
 3566      If the size qualifies as a fastbin, first check corresponding bin.
 3567      This code is safe to execute even if av is not yet initialized, so we
 3568      can try it without checking, which saves some time on this fast path.
@@ -64,7 +68,7 @@
 3577     }             \
 3578   while ((pp = catomic_compare_and_exchange_val_acq (fb, victim-&gt;fd, victim)) \
 3579    != victim);          \
-3580</pre><p>　REMOVE_FB マクロを定義しています。</p><pre class="programlisting">3581   if ((unsigned long) (nb) &lt;= (unsigned long) (get_max_fast ()))
+3580</pre><p>REMOVE_FB マクロを定義しています。</p><pre xmlns="" class="prettyprint">3581   if ((unsigned long) (nb) &lt;= (unsigned long) (get_max_fast ()))
 3582     {
 3583       idx = fastbin_index (nb);
 3584       mfastbinptr *fb = &amp;fastbin (av, idx);
@@ -113,7 +117,7 @@
 3627       }
 3628   }
 3629     }
-3630</pre><p>　リクエストサイズに応じたビンにアクセスするためにインデックスを算出します。</p><p>　ビンの最初のチャンクを削除して、victim がそのチャンクを指すようにします。</p><p>　victim が NULL ならスモールビン（ Small Bin ）のチェックに進みます。</p><p>　victim が NULL でないならチャンクサイズをチェックし、該当するビンにあることを確かめ、そうでないならエラーを投げます。</p><p>　最後に alloc_perturb をコールしポインターを返します。</p><pre class="programlisting">3631   /*
+3630</pre><p>リクエストサイズに応じたビンにアクセスするためにインデックスを算出します。</p><p>ビンの最初のチャンクを削除して、victim がそのチャンクを指すようにします。</p><p>victim が NULL ならスモールビン（ Small Bin ）のチェックに進みます。</p><p>victim が NULL でないならチャンクサイズをチェックし、該当するビンにあることを確かめ、そうでないならエラーを投げます。</p><p>最後に alloc_perturb() をコールしポインターを返します。</p><pre xmlns="" class="prettyprint">3631   /*
 3632      If a small request, check regular bin.  Since these "smallbins"
 3633      hold one size each, no searching within bins is necessary.
 3634      (For a large request, we need to wait until unsorted chunks are
@@ -125,14 +129,14 @@
 3640     {
 3641       idx = smallbin_index (nb);
 3642       bin = bin_at (av, idx);
-3643</pre><p>　リクエストサイズがスモールビン( Small Bin )の範囲内に処理されるコードブロックですね。</p><p>　リクエストサイズに応じたビンにアクセスするためのインデックスを算出します。</p><pre class="programlisting">3644       if ((victim = last (bin)) != bin)
-3645         {</pre><p>　該当するビンにチャンクが存在しない場合は次のケースに飛びます。</p><p>　last(bin) つまり bin→bk が victim へ代入されますが、もし bin が同じなら malloc_consolidate() 関数をコールしてから、次のケースにスキップします。</p><pre class="programlisting">3646           bck = victim-&gt;bk;
+3643</pre><p>リクエストサイズがスモールビン( Small Bin )の範囲内に処理されるコードブロックですね。</p><p>リクエストサイズに応じたビンにアクセスするためのインデックスを算出します。</p><pre xmlns="" class="prettyprint">3644       if ((victim = last (bin)) != bin)
+3645         {</pre><p>該当するビンにチャンクが存在しない場合は次のケースに飛びます。</p><p>last(bin) つまり bin→bk が victim へ代入されますが、もし bin が同じなら malloc_consolidate() 関数をコールしてから、次のケースにスキップします。</p><pre xmlns="" class="prettyprint">3646           bck = victim-&gt;bk;
 3647     if (__glibc_unlikely (bck-&gt;fd != victim))
-3648       malloc_printerr ("malloc(): smallbin double linked list corrupted");</pre><p>　bin→bk が bin と違うとするなら、victim→bk→fd と victim が同じかチェックします。</p><p>　もし同じでないなら malloc_printerr をコールしてエラーを投げます。</p><pre class="programlisting">3649           set_inuse_bit_at_offset (victim, nb);</pre><p>　victim の次のチャンクのために PREV_INUSE ビットを設定します。</p><pre class="programlisting">3650           bin-&gt;bk = bck;
-3651           bck-&gt;fd = bin;</pre><p>　このチャンクをビンのリストから削除します。</p><pre class="programlisting">3652
+3648       malloc_printerr ("malloc(): smallbin double linked list corrupted");</pre><p>bin→bk が bin と違うとするなら、victim→bk→fd と victim が同じかチェックします。</p><p>もし同じでないなら malloc_printerr() をコールしてエラーを投げます。</p><pre xmlns="" class="prettyprint">3649           set_inuse_bit_at_offset (victim, nb);</pre><p>victim の次のチャンクのために PREV_INUSE ビットを設定します。</p><pre xmlns="" class="prettyprint">3650           bin-&gt;bk = bck;
+3651           bck-&gt;fd = bin;</pre><p>このチャンクをビンのリストから削除します。</p><pre xmlns="" class="prettyprint">3652
 3653           if (av != &amp;main_arena)
 3654       set_non_main_arena (victim);
-3655           check_malloced_chunk (av, victim, nb);</pre><p>　av に応じた適切なアリーナのビットをこのチャンクに設定します。</p><pre class="programlisting">3656 #if USE_TCACHE
+3655           check_malloced_chunk (av, victim, nb);</pre><p>av に応じた適切なアリーナのビットをこのチャンクに設定します。</p><pre xmlns="" class="prettyprint">3656 #if USE_TCACHE
 3657     /* While we're here, if we see other chunks of the same size,
 3658        stash them in the tcache.  */
 3659     size_t tc_idx = csize2tidx (nb);
@@ -157,11 +161,11 @@
 3678               }
 3679     }
 3680       }
-3681 #endif</pre><p>　TCACHE についての説明は割愛します。</p><pre class="programlisting">3682           void *p = chunk2mem (victim);
+3681 #endif</pre><p>TCACHE についての説明は割愛します。</p><pre xmlns="" class="prettyprint">3682           void *p = chunk2mem (victim);
 3683           alloc_perturb (p, bytes);
 3684           return p;
 3685         }
-3686     }</pre><p>　後は alloc_perturb() をコールしてポインターを返します。</p><pre class="programlisting">3687
+3686     }</pre><p>後は alloc_perturb() をコールしてポインターを返します。</p><pre xmlns="" class="prettyprint">3687
 3688   /*
 3689      If this is a large request, consolidate fastbins before continuing.
 3690      While it might look excessive to kill all fastbins before
@@ -178,7 +182,7 @@
 3701       idx = largebin_index (nb);
 3702       if (atomic_load_relaxed (&amp;av-&gt;have_fastchunks))
 3703         malloc_consolidate (av);
-3704     }</pre><p>　bin→bk と bin が同じ場合に呼ばれます。</p><p>　リクエストサイズに応じた適切なビンのインデックスを算出します。</p><p>　もし av がファーストチャンク（Fast Bin のチャンク）を保持しているなら malloc_consolidate() を av に対してコールします。</p><p>　ここまではファーストビン、スモールビンにはチャンクがないか、リクエストサイズが該当しませんでした。</p><p>　残りはラージビン（ Large Bin ）だけですね…　(´・ω・｀)</p><pre class="programlisting">3705
+3704     }</pre><p>bin→bk と bin が同じ場合に呼ばれます。</p><p>リクエストサイズに応じた適切なビンのインデックスを算出します。</p><p>もし av がファーストチャンク（Fast Bin のチャンク）を保持しているなら malloc_consolidate() を av に対してコールします。</p><p>ここまではファーストビン、スモールビンにはチャンクがないか、リクエストサイズが該当しませんでした。</p><p>残りはラージビン（ Large Bin ）だけですね…　(´・ω・｀)</p><pre xmlns="" class="prettyprint">3705
 3706   /*
 3707      Process recently freed or remaindered chunks, taking one only if
 3708      it is exact fit, or, if this a small request, the chunk is remainder from
@@ -203,15 +207,15 @@
 3727 #endif
 3728
 3729   for (;; )
-3730     {</pre><p>　このループではチャンクをビンに挿入していきます。</p><pre class="programlisting">3731       int iters = 0;
-3732       while ((victim = unsorted_chunks (av)-&gt;bk) != unsorted_chunks (av))</pre><p>　未整理ビン（ Unsorted Bin ）にチャンクがないかチェックして victim に代入します。</p><pre class="programlisting">3733         {
+3730     {</pre><p>このループではチャンクをビンに挿入していきます。</p><pre xmlns="" class="prettyprint">3731       int iters = 0;
+3732       while ((victim = unsorted_chunks (av)-&gt;bk) != unsorted_chunks (av))</pre><p>未整理ビン（ Unsorted Bin ）にチャンクがないかチェックして victim に代入します。</p><pre xmlns="" class="prettyprint">3733         {
 3734           bck = victim-&gt;bk;
 3735           if (__builtin_expect (chunksize_nomask (victim) &lt;= 2 * SIZE_SZ, 0)
 3736               || __builtin_expect (chunksize_nomask (victim)
 3737            &gt; av-&gt;system_mem, 0))
 3738             malloc_printerr ("malloc(): memory corruption");
 3739           size = chunksize (victim);
-3740</pre><p>　victim のチャンクサイズが 2*SIZE_SZ と最大値の範囲内にあるかチェックし、範囲外であればエラーを投げます。</p><p>　問題がなければ victim のチャンクサイズが size 変数に代入されます。</p><pre class="programlisting">3741           /*
+3740</pre><p>victim のチャンクサイズが 2*SIZE_SZ と最大値の範囲内にあるかチェックし、範囲外であればエラーを投げます。</p><p>問題がなければ victim のチャンクサイズが size 変数に代入されます。</p><pre xmlns="" class="prettyprint">3741           /*
 3742              If a small request, try to use last remainder if it is the
 3743              only chunk in unsorted bin.  This helps promote locality for
 3744              runs of consecutive small requests. This is the only
@@ -245,15 +249,15 @@
 3772               void *p = chunk2mem (victim);
 3773               alloc_perturb (p, bytes);
 3774               return p;
-3775             }</pre><p>　リクエストサイズがスモールビンの範囲内にあり、未整理ビンのチャンクで、チャンクサイズがリクエストサイズ以上で、victim が最後に残っているチャンクである場合には if 文のブロックが処理されます。</p><p>　2 つのチャンクに分割します。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+3775             }</pre><p>リクエストサイズがスモールビンの範囲内にあり、未整理ビンのチャンクで、チャンクサイズがリクエストサイズ以上で、victim が最後に残っているチャンクである場合には if 文のブロックが処理されます。</p><p>2 つのチャンクに分割します。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 １つめのチャンクはリクエストサイズにマッチする
 </li><li class="listitem">
 残りのチャンクは新たな残りチャンクになり、未整理ビン（ Unsorted Bin ）に挿入される。
-</li></ul></div><p>　1 つめのチャンクは alloc_perturb をコールしてから返されます。</p><pre class="programlisting">3776
+</li></ul></div><p>1 つめのチャンクは alloc_perturb をコールしてから返されます。</p><pre xmlns="" class="prettyprint">3776
 3777           /* remove from unsorted list */
 3778           unsorted_chunks (av)-&gt;bk = bck;
 3779           bck-&gt;fd = unsorted_chunks (av);
-3780</pre><p>　未整理ビン（ Unsorted Bin ）からチャンクを削除します。</p><pre class="programlisting">3781           /* Take now instead of binning if exact fit */
+3780</pre><p>未整理ビン（ Unsorted Bin ）からチャンクを削除します。</p><pre xmlns="" class="prettyprint">3781           /* Take now instead of binning if exact fit */
 3782
 3783           if (size == nb)
 3784             {
@@ -280,7 +284,7 @@
 3805 #if USE_TCACHE
 3806     }
 3807 #endif
-3808             }</pre><p>　もし victim のチャンクサイズがリクエストサイズと同じなら alloc_perturb をコールしてからポインターを返します。</p><pre class="programlisting">3809
+3808             }</pre><p>もし victim のチャンクサイズがリクエストサイズと同じなら alloc_perturb をコールしてからポインターを返します。</p><pre xmlns="" class="prettyprint">3809
 3810           /* place chunk in bin */
 3811
 3812           if (in_smallbin_range (size))
@@ -288,7 +292,7 @@
 3814               victim_index = smallbin_index (size);
 3815               bck = bin_at (av, victim_index);
 3816               fwd = bck-&gt;fd;
-3817             }</pre><p>　もし victim のチャンクサイズがスモールビン（ Small Bin ）の範囲内にあるなら、チャンクを該当するスモールビンの HEAD の位置に挿入します。</p><pre class="programlisting">3818           else
+3817             }</pre><p>もし victim のチャンクサイズがスモールビン（ Small Bin ）の範囲内にあるなら、チャンクを該当するスモールビンの HEAD の位置に挿入します。</p><pre xmlns="" class="prettyprint">3818           else
 3819             {
 3820               victim_index = largebin_index (size);
 3821               bck = bin_at (av, victim_index);
@@ -343,7 +347,7 @@
 3870           victim-&gt;fd = fwd;
 3871           fwd-&gt;bk = victim;
 3872           bck-&gt;fd = victim;
-3873</pre><p>　ラージビン（ Large Bin ）にチャンクを挿入します。</p><p>　まず最後の最少チャンクをチェックします。</p><p>　次に victim が最後のチャンクより小さい場合は最後の位置に挿入します。</p><p>　小さくないのであれば、victim 以上のサイズを持つチャンクをループで探索して、挿入します。</p><p>　もしサイズが同じであれば該当チャンクの次の位置に挿入します。</p><pre class="programlisting">3874 #if USE_TCACHE
+3873</pre><p>ラージビン（ Large Bin ）にチャンクを挿入します。</p><p>まず最後の最少チャンクをチェックします。</p><p>次に victim が最後のチャンクより小さい場合は最後の位置に挿入します。</p><p>小さくないのであれば、victim 以上のサイズを持つチャンクをループで探索して、挿入します。</p><p>もしサイズが同じであれば該当チャンクの次の位置に挿入します。</p><pre xmlns="" class="prettyprint">3874 #if USE_TCACHE
 3875       /* If we've processed as many chunks as we're allowed while
 3876    filling the cache, return one of the cached ones.  */
 3877       ++tcache_unsorted_count;
@@ -358,30 +362,30 @@
 3886 #define MAX_ITERS       10000
 3887           if (++iters &gt;= MAX_ITERS)
 3888             break;
-3889         }</pre><p>　上記の処理を 10000 回繰り返します。</p><pre class="programlisting">3890
+3889         }</pre><p>上記の処理を 10000 回繰り返します。</p><pre xmlns="" class="prettyprint">3890
 3891 #if USE_TCACHE
 3892       /* If all the small chunks we found ended up cached, return one now.  */
 3893       if (return_cached)
 3894   {
 3895     return tcache_get (tc_idx);
 3896   }
-3897 #endif</pre><p>　TCACHE は割愛です…　(´・ω・｀)</p><pre class="programlisting">3898
+3897 #endif</pre><p>TCACHE は割愛です…　(´・ω・｀)</p><pre xmlns="" class="prettyprint">3898
 3899       /*
 3900          If a large request, scan through the chunks of current bin in
 3901          sorted order to find smallest that fits.  Use the skip list for this.
 3902        */
 3903
 3904       if (!in_smallbin_range (nb))
-3905         {</pre><p>　リクエストサイズがスモールビンの範囲外かチェックします。</p><pre class="programlisting">3906           bin = bin_at (av, idx);</pre><p>　ラージビンのインデックスを算出します。</p><pre class="programlisting">3907
+3905         {</pre><p>リクエストサイズがスモールビンの範囲外かチェックします。</p><pre xmlns="" class="prettyprint">3906           bin = bin_at (av, idx);</pre><p>ラージビンのインデックスを算出します。</p><pre xmlns="" class="prettyprint">3907
 3908           /* skip scan if empty or largest chunk is too small */
 3909           if ((victim = first (bin)) != bin
 3910         &amp;&amp; (unsigned long) chunksize_nomask (victim)
 3911           &gt;= (unsigned long) (nb))
-3912             {</pre><p>　ビンの最初のチャンク（最大のチャンクサイズ）がリクエストサイズより大きいかチェックします。</p><pre class="programlisting">3913               victim = victim-&gt;bk_nextsize;
+3912             {</pre><p>ビンの最初のチャンク（最大のチャンクサイズ）がリクエストサイズより大きいかチェックします。</p><pre xmlns="" class="prettyprint">3913               victim = victim-&gt;bk_nextsize;
 3914               while (((unsigned long) (size = chunksize (victim)) &lt;
 3915                       (unsigned long) (nb)))
 3916                 victim = victim-&gt;bk_nextsize;
-3917</pre><p>　リクエストサイズ以上の最少サイズチャンクを見つけられるまで反復します。</p><pre class="programlisting">3918               /* Avoid removing the first entry for a size so that the skip
+3917</pre><p>リクエストサイズ以上の最少サイズチャンクを見つけられるまで反復します。</p><pre xmlns="" class="prettyprint">3918               /* Avoid removing the first entry for a size so that the skip
 3919                  list does not have to be rerouted.  */
 3920               if (victim != last (bin)
 3921       &amp;&amp; chunksize_nomask (victim)
@@ -389,14 +393,14 @@
 3923                 victim = victim-&gt;fd;
 3924
 3925               remainder_size = size - nb;
-3926               unlink (av, victim, bck, fwd);</pre><p>　残りのサイズ（ remainder_size ）を算出しときます。</p><p>　unlink をコールして victim をビンから削除します。</p><pre class="programlisting">3927
+3926               unlink (av, victim, bck, fwd);</pre><p>残りのサイズ（ remainder_size ）を算出しときます。</p><p>unlink をコールして victim をビンから削除します。</p><pre xmlns="" class="prettyprint">3927
 3928               /* Exhaust */
 3929               if (remainder_size &lt; MINSIZE)
 3930                 {
 3931                   set_inuse_bit_at_offset (victim, size);
 3932                   if (av != &amp;main_arena)
 3933         set_non_main_arena (victim);
-3934                 }</pre><p>　残りのサイズ（ remainder_size ）が最少チャンクサイズ（MINSIZE）より小さいなら、一つのチャンクを返します。</p><pre class="programlisting">3935               /* Split */
+3934                 }</pre><p>残りのサイズ（ remainder_size ）が最少チャンクサイズ（MINSIZE）より小さいなら、一つのチャンクを返します。</p><pre xmlns="" class="prettyprint">3935               /* Split */
 3936               else
 3937                 {
 3938                   remainder = chunk_at_offset (victim, nb);
@@ -419,12 +423,12 @@
 3955                             (av != &amp;main_arena ? NON_MAIN_ARENA : 0));
 3956                   set_head (remainder, remainder_size | PREV_INUSE);
 3957                   set_foot (remainder, remainder_size);
-3958                 }</pre><p>　残りのサイズ（ remainder_size ）が最少チャンクサイズ（MINSIZE）以上なら、2 個のチャンクに分割します。</p><p>　unsorted_chunks(av)-&gt;fd-&gt;bk == unsorted_chunks(av) かチェックして違うなら、エラーを投げます。</p><pre class="programlisting">3959               check_malloced_chunk (av, victim, nb);
+3958                 }</pre><p>残りのサイズ（ remainder_size ）が最少チャンクサイズ（MINSIZE）以上なら、2 個のチャンクに分割します。</p><p>unsorted_chunks(av)→fd→bk == unsorted_chunks(av) かチェックして違うなら、エラーを投げます。</p><pre xmlns="" class="prettyprint">3959               check_malloced_chunk (av, victim, nb);
 3960               void *p = chunk2mem (victim);
 3961               alloc_perturb (p, bytes);
 3962               return p;
 3963             }
-3964         }</pre><p>　alloc_perturb() をコールした後にポインターを返します。</p><pre class="programlisting">3965
+3964         }</pre><p>alloc_perturb() をコールした後にポインターを返します。</p><pre xmlns="" class="prettyprint">3965
 3966       /*
 3967          Search for a chunk by scanning bins, starting with next largest
 3968          bin. This search is strictly by best-fit; i.e., the smallest
@@ -440,7 +444,7 @@
 3978       bin = bin_at (av, idx);
 3979       block = idx2block (idx);
 3980       map = av-&gt;binmap[block];
-3981       bit = idx2bit (idx);</pre><p>　次のビンを調べるためにインデックスをインクリメントします。</p><p>　av-&gt;binmap を使って空のビンをスキップしていきます。</p><pre class="programlisting">3982
+3981       bit = idx2bit (idx);</pre><p>次のビンを調べるためにインデックスをインクリメントします。</p><p>av→binmap を使って空のビンをスキップしていきます。</p><pre xmlns="" class="prettyprint">3982
 3983       for (;; )
 3984         {
 3985           /* Skip rest of block if there are no more set bits in this block.  */
@@ -456,23 +460,23 @@
 3995               bin = bin_at (av, (block &lt;&lt; BINMAPSHIFT));
 3996               bit = 1;
 3997             }
-3998</pre><p>　ビンマップのビットが該当する（ビンマップの）ブロックにおいて空であるなら use_top にスキップします。</p><pre class="programlisting">3999           /* Advance to bin with set bit. There must be one. */
+3998</pre><p>ビンマップのビットが該当する（ビンマップの）ブロックにおいて空であるなら use_top にスキップします。</p><pre xmlns="" class="prettyprint">3999           /* Advance to bin with set bit. There must be one. */
 4000           while ((bit &amp; map) == 0)
 4001             {
 4002               bin = next_bin (bin);
 4003               bit &lt;&lt;= 1;
 4004               assert (bit != 0);
-4005             }</pre><p>　ビットが設定されたビンを探索します。（一つはあるはず）</p><pre class="programlisting">4006
+4005             }</pre><p>ビットが設定されたビンを探索します。（一つはあるはず）</p><pre xmlns="" class="prettyprint">4006
 4007           /* Inspect the bin. It is likely to be non-empty */
 4008           victim = last (bin);
-4009</pre><p>　victim は現在のビンの最後を指させます。</p><p>　victim は空でないビンの最後のチャンクを指しています。</p><pre class="programlisting">4010           /*  If a false alarm (empty bin), clear the bit. */
+4009</pre><p>victim は現在のビンの最後を指させます。</p><p>victim は空でないビンの最後のチャンクを指しています。</p><pre xmlns="" class="prettyprint">4010           /*  If a false alarm (empty bin), clear the bit. */
 4011           if (victim == bin)
 4012             {
 4013               av-&gt;binmap[block] = map &amp;= ~bit; /* Write through */
 4014               bin = next_bin (bin);
 4015               bit &lt;&lt;= 1;
 4016             }
-4017</pre><p>　ビンマップを使って空のビンをスキップします。</p><pre class="programlisting">4018           else
+4017</pre><p>ビンマップを使って空のビンをスキップします。</p><pre xmlns="" class="prettyprint">4018           else
 4019             {
 4020               size = chunksize (victim);
 4021
@@ -527,7 +531,7 @@
 4070               return p;
 4071             }
 4072         }
-4073</pre><p>　2 つのチャンクに分割（ Split ）します。</p><p>　そして残りのチャンクは未整理ビン（ Unsorted Bin ）に挿入します。</p><pre class="programlisting">4074     use_top:
+4073</pre><p>2 つのチャンクに分割（ Split ）します。</p><p>そして残りのチャンクは未整理ビン（ Unsorted Bin ）に挿入します。</p><pre xmlns="" class="prettyprint">4074     use_top:
 4075       /*
 4076          If large enough, split off the chunk bordering the end of memory
 4077          (held in av-&gt;top). Note that this is in accord with the best-fit
@@ -543,7 +547,7 @@
 4087          to put in fenceposts in sysmalloc.)
 4088        */
 4089
-4090       victim = av-&gt;top;</pre><p>　victim は av-&gt;top を指します。</p><pre class="programlisting">4091       size = chunksize (victim);
+4090       victim = av-&gt;top;</pre><p>victim は av→top を指します。</p><pre xmlns="" class="prettyprint">4091       size = chunksize (victim);
 4092
 4093       if ((unsigned long) (size) &gt;= (unsigned long) (nb + MINSIZE))
 4094         {
@@ -558,7 +562,7 @@
 4103           void *p = chunk2mem (victim);
 4104           alloc_perturb (p, bytes);
 4105           return p;
-4106         }</pre><p>　victim チャンクのサイズがリクエストサイズ + MINSIZE 以上ならば 2 つのチャンクに分割（ Split ）する。</p><p>　片方は p として返し、残りのチャンクは新たなトップチャンクになります。</p><p>　空のビンが見つからないなら、トップチャンク( Top Chunk )を使ってリクエストを処理してますね。</p><pre class="programlisting">4107
+4106         }</pre><p>victim チャンクのサイズがリクエストサイズ + MINSIZE 以上ならば 2 つのチャンクに分割（ Split ）する。</p><p>片方は p として返し、残りのチャンクは新たなトップチャンクになります。</p><p>空のビンが見つからないなら、トップチャンク( Top Chunk )を使ってリクエストを処理してますね。</p><pre xmlns="" class="prettyprint">4107
 4108       /* When we are using atomic ops to free fast chunks we can get
 4109          here for all block sizes.  */
 4110       else if (atomic_load_relaxed (&amp;av-&gt;have_fastchunks))
@@ -569,7 +573,7 @@
 4115             idx = smallbin_index (nb);
 4116           else
 4117             idx = largebin_index (nb);
-4118         }</pre><p>　アリーナ av にファーストチャンクがあるかチェックします。</p><p>　ある場合は malloc_consolidate(av) コールしてからループに戻ります。</p><pre class="programlisting">4119
+4118         }</pre><p>アリーナ av にファーストチャンクがあるかチェックします。</p><p>ある場合は malloc_consolidate(av) コールしてからループに戻ります。</p><pre xmlns="" class="prettyprint">4119
 4120       /*
 4121          Otherwise, relay to handle system-dependent cases
 4122        */
@@ -581,4 +585,4 @@
 4128           return p;
 4129         }
 4130     }
-4131 }</pre><p>　チャンクの分割や malloc_consolidate をしない場合は、sysmalloc() をコールしてメモリー領域を割り当てます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch49.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch49.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch50.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+4131 }</pre><p>チャンクの分割や malloc_consolidate をしない場合は、sysmalloc() をコールしてメモリー領域を割り当てます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch49.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch49.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch50.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

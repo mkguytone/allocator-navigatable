@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第101章 sizeof を使った割り当てサイズの算出によるスタックアロケーター実装</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt12.html" title="パート XII. C++ カスタムアロケーターの STL サポート（実験）" /><link rel="prev" href="ch100.html" title="第100章 STL コンテナ側のメモリー割り当て要件" /><link rel="next" href="pt13.html" title="パート XIII. mmap() を使ったカスタムアロケーター" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch100.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt13.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_sizeof_を使った割り当てサイズの算出によるスタックアロケーター実装"></a>第101章 sizeof を使った割り当てサイズの算出によるスタックアロケーター実装</h2></div></div></div><p>では前の項目の実装アイデアを試してみたですね。</p><p>しかしここまでヒープアロケーターの実装しかしていないので、ヒープだけでなく STL コンテナ側に対応したスタックアロケーターもついでに作って見ましょう。</p><div class="note" style="margin-left: 0; margin-right: 10%;"><h3 class="title">注記</h3><p>実際割り当てられる領域はスタックじゃないのですが、便宜上スタックアロケーターとします。</p></div><p>スタックアロケーターではメモリーの解放は自動なので、デストラクターはあまり考えなくても良いです。</p><p>抱負として全力で取り組みたいのは、コンストラクターと、メモリープールの設計です。</p><p>ではサンプルコードを見てみましょう。</p><p><strong>main.cpp. </strong>
-</p><pre class="programlisting">  1 #include &lt;cstddef&gt;
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第101章 sizeof を使った割り当てサイズの算出によるスタックアロケーター実装</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt12.html" title="パート XII. C++ カスタムアロケーターの STL サポート（実験）" /><link rel="prev" href="ch100.html" title="第100章 STL コンテナ側のメモリー割り当て要件" /><link rel="next" href="pt13.html" title="パート XIII. mmap() を使ったカスタムアロケーター" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch100.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt13.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_sizeof_を使った割り当てサイズの算出によるスタックアロケーター実装"></a>第101章 sizeof を使った割り当てサイズの算出によるスタックアロケーター実装</h2></div></div></div><p>では前の項目の実装アイデアを試してみたですね。</p><p>しかしここまでヒープアロケーターの実装しかしていないので、ヒープだけでなく STL コンテナ側に対応したスタックアロケーターもついでに作って見ましょう。</p><div class="note" style="margin-left: 0; margin-right: 10%;"><h3 class="title">注記</h3><p>実際割り当てられる領域はスタックじゃないのですが、便宜上スタックアロケーターとします。</p></div><p>スタックアロケーターではメモリーの解放は自動なので、デストラクターはあまり考えなくても良いです。</p><p>抱負として全力で取り組みたいのは、コンストラクターと、メモリープールの設計です。</p><p>ではサンプルコードを見てみましょう。</p><p><strong>main.cpp. </strong>
+</p><pre xmlns="" class="prettyprint">  1 #include &lt;cstddef&gt;
   2 #include &lt;memory&gt;
   3 #include &lt;cassert&gt;
   4 #include &lt;cstdlib&gt;
@@ -162,23 +166,23 @@
 160
 161 private:
 162
-163   static allocator<a id="CO1-33"></a>(1) S_alloc8_;
-164   static allocator<a id="CO1-34"></a>(2) S_alloc16_;
-165   static allocator<a id="CO1-35"></a>(3) S_alloc32_;
-166   static allocator<a id="CO1-36"></a>(4) S_alloc256_;
+163   static allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-33"></a>(1) S_alloc8_;
+164   static allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-34"></a>(2) S_alloc16_;
+165   static allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-35"></a>(3) S_alloc32_;
+166   static allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-36"></a>(4) S_alloc256_;
 167 };
 168
 169 template&lt;typename T&gt;
-170 allocator<a id="CO1-37"></a>(5) block_allocator&lt;T&gt;::S_alloc8_;
+170 allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-37"></a>(5) block_allocator&lt;T&gt;::S_alloc8_;
 171
 172 template&lt;typename T&gt;
-173 allocator<a id="CO1-38"></a>(6) block_allocator&lt;T&gt;::S_alloc16_;
+173 allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-38"></a>(6) block_allocator&lt;T&gt;::S_alloc16_;
 174
 175 template&lt;typename T&gt;
-176 allocator<a id="CO1-39"></a>(7) block_allocator&lt;T&gt;::S_alloc32_;
+176 allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-39"></a>(7) block_allocator&lt;T&gt;::S_alloc32_;
 177
 178 template&lt;typename T&gt;
-179 allocator<a id="CO1-40"></a>(8) block_allocator&lt;T&gt;::S_alloc256_;
+179 allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-40"></a>(8) block_allocator&lt;T&gt;::S_alloc256_;
 180
 181 /* voidパラメーターのエラーチェックのためにvoid型のクラステンプレートを用意 */
 182
@@ -322,13 +326,13 @@
 320
 321   return 0;
 322 }</pre><p>
-</p><p>まずコンストラクターの説明をしたいところですが、2 つのクラステンプレートの違いを先に説明しますね。</p><pre class="programlisting"> 82 template&lt;typename T&gt;
+</p><p>まずコンストラクターの説明をしたいところですが、2 つのクラステンプレートの違いを先に説明しますね。</p><pre xmlns="" class="prettyprint"> 82 template&lt;typename T&gt;
  83 class block_allocator
  84 {
- 85 public:</pre><p>block_allocator はアロケーターと STL コンテナとのインターフェースになります。</p><p>このクラステンプレートは内部ロジックは基本的に空でして、実装するクラステンプレートのインスタンスのメンバー関数を呼び出す役割があります。</p><p>保持したい状態は無いので、コンストラクターとデストラクターは空にします。</p><pre class="programlisting"> 18 template&lt;std::size_t N&gt;
+ 85 public:</pre><p>block_allocator はアロケーターと STL コンテナとのインターフェースになります。</p><p>このクラステンプレートは内部ロジックは基本的に空でして、実装するクラステンプレートのインスタンスのメンバー関数を呼び出す役割があります。</p><p>保持したい状態は無いので、コンストラクターとデストラクターは空にします。</p><pre xmlns="" class="prettyprint"> 18 template&lt;std::size_t N&gt;
  19 class allocator
  20 {
- 21 public:</pre><p>allocator クラスはカスタムスタックアロケーターの実装箇所となりますね。</p><p>テンプレートパラメーターの N はアロケーターの持つメモリープールが 1 個分の要素の割り当てに使うバイトサイズです。</p><p>通常は N=8 ならば 8 バイトの要素、N=32 ならば 32 バイトの要素を割り当てます。</p><p>これを便宜上ブロックサイズと呼べないことも無いのですが、このカスタムアロケーターのブロックサイズは T 型によって変動します。</p><pre class="programlisting"> 15 #define MAX_OBJECTS 1024
+ 21 public:</pre><p>allocator クラスはカスタムスタックアロケーターの実装箇所となりますね。</p><p>テンプレートパラメーターの N はアロケーターの持つメモリープールが 1 個分の要素の割り当てに使うバイトサイズです。</p><p>通常は N=8 ならば 8 バイトの要素、N=32 ならば 32 バイトの要素を割り当てます。</p><p>これを便宜上ブロックサイズと呼べないことも無いのですが、このカスタムアロケーターのブロックサイズは T 型によって変動します。</p><pre xmlns="" class="prettyprint"> 15 #define MAX_OBJECTS 1024
  16 #define MAX_ALLOCS 4
  17
  18 template&lt;std::size_t N&gt;
@@ -350,7 +354,7 @@
  34   }
  35
  36   inline ~allocator(){
- 37   }</pre><pre class="programlisting"> 15 #define MAX_OBJECTS 1024
+ 37   }</pre><pre xmlns="" class="prettyprint"> 15 #define MAX_OBJECTS 1024
  16 #define MAX_ALLOCS 4
  17
  18 template&lt;std::size_t N&gt;
@@ -367,8 +371,8 @@
  75   std::byte* Mp_pool_;
  76   unsigned M_pool_index_; //新規割当時にインクリメント、下がることはない
  77   std::byte Mp_Mem_[sizeof(std::byte[N])*MAX_OBJECTS];
- 78 };</pre><p>T 型が std::pair 型でないなら N バイトに MAX_OBJECTS を乗じた値が配列サイズとなります。</p><p>それと class allocator にはフリーリストも定義されています。</p><pre class="programlisting"> 36   typedef std::map&lt;size_type,std::vector&lt;void*&gt;&gt; free_list_t;
- 37   typedef std::map&lt;void*,size_type&gt; size_list_t;</pre><p>free_list_t ではブロックサイズをキーとして、データを std::vector&lt;void*&gt; とします。</p><p>std::vector&lt;void*&gt; は解放済みの領域のメモリーアドレスを保管するリストです。</p><p>つまりサイズをインデックスにして検索すると std::vector&lt;void*&gt; 型のリストが返ってくるみたいなイメージですね。</p><p>size_list_t はメモリーアドレスをキーとして、データをブロックサイズとします。</p><p>それとスタティックインスタンスについては以下のように定義しています。</p><pre class="programlisting"> 82 template&lt;typename T&gt;
+ 78 };</pre><p>T 型が std::pair 型でないなら N バイトに MAX_OBJECTS を乗じた値が配列サイズとなります。</p><p>それと class allocator にはフリーリストも定義されています。</p><pre xmlns="" class="prettyprint"> 36   typedef std::map&lt;size_type,std::vector&lt;void*&gt;&gt; free_list_t;
+ 37   typedef std::map&lt;void*,size_type&gt; size_list_t;</pre><p>free_list_t ではブロックサイズをキーとして、データを std::vector&lt;void*&gt; とします。</p><p>std::vector&lt;void*&gt; は解放済みの領域のメモリーアドレスを保管するリストです。</p><p>つまりサイズをインデックスにして検索すると std::vector&lt;void*&gt; 型のリストが返ってくるみたいなイメージですね。</p><p>size_list_t はメモリーアドレスをキーとして、データをブロックサイズとします。</p><p>それとスタティックインスタンスについては以下のように定義しています。</p><pre xmlns="" class="prettyprint"> 82 template&lt;typename T&gt;
  83 class block_allocator
  84 {
  85 public:
@@ -377,23 +381,23 @@
 
 161 private:
 162
-163   static allocator<a id="CO1-41"></a>(1) S_alloc8_;
-164   static allocator<a id="CO1-42"></a>(2) S_alloc16_;
-165   static allocator<a id="CO1-43"></a>(3) S_alloc32_;
-166   static allocator<a id="CO1-44"></a>(4) S_alloc256_;
+163   static allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-41"></a>(1) S_alloc8_;
+164   static allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-42"></a>(2) S_alloc16_;
+165   static allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-43"></a>(3) S_alloc32_;
+166   static allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-44"></a>(4) S_alloc256_;
 167 };
 168
 169 template&lt;typename T&gt;
-170 allocator<a id="CO1-45"></a>(5) block_allocator&lt;T&gt;::S_alloc8_;
+170 allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-45"></a>(5) block_allocator&lt;T&gt;::S_alloc8_;
 171
 172 template&lt;typename T&gt;
-173 allocator<a id="CO1-46"></a>(6) block_allocator&lt;T&gt;::S_alloc16_;
+173 allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-46"></a>(6) block_allocator&lt;T&gt;::S_alloc16_;
 174
 175 template&lt;typename T&gt;
-176 allocator<a id="CO1-47"></a>(7) block_allocator&lt;T&gt;::S_alloc32_;
+176 allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-47"></a>(7) block_allocator&lt;T&gt;::S_alloc32_;
 177
 178 template&lt;typename T&gt;
-179 allocator<a id="CO1-48"></a>(8) block_allocator&lt;T&gt;::S_alloc256_;</pre><p>8, 16, 32, 256 バイトの 4 種類のアロケーターのインスタンスを作っています。</p><p>次になぜか今回はブロックサイズはコンストラクターではなく allocate() 関数で取るようにしていますね。</p><pre class="programlisting">110   inline pointer allocate(size_type n, typename std::allocator&lt;T&gt;::const_pointer = 0)
+179 allocator<a xmlns="http://www.w3.org/1999/xhtml" id="CO1-48"></a>(8) block_allocator&lt;T&gt;::S_alloc256_;</pre><p>8, 16, 32, 256 バイトの 4 種類のアロケーターのインスタンスを作っています。</p><p>次になぜか今回はブロックサイズはコンストラクターではなく allocate() 関数で取るようにしていますね。</p><pre xmlns="" class="prettyprint">110   inline pointer allocate(size_type n, typename std::allocator&lt;T&gt;::const_pointer = 0)
 111   {
 112     size_t s = sizeof(T);
 113     std::printf("request size: %lu\n",s);
@@ -407,7 +411,7 @@
 121     else
 122       return reinterpret_cast&lt;T*&gt;(S_alloc256_.allocate(n));
 123   }</pre><p>これは STL コンテナ側の事情でコピーコンストラクターが使用されているので T はデフォルトコンストラクターの T ではなくなっているという状況でしょうね。</p><p>では実行結果を見てみたいと思います。</p><p><strong>ビルドと実行結果. </strong>
-</p><pre class="programlisting">$ g++ main.cpp -std=c++17
+</p><pre xmlns="" class="prettyprint">$ g++ main.cpp -std=c++17
 $ ./a.out
 M_block_size_: 8
 M_block_size_: 16
@@ -557,7 +561,7 @@ destroy 0x556da7aff210
 destroy 0x556da7aff214
 destroy 0x556da7aff218
 deallocate: 0x556da7aff204 with size 64</pre><p>
-</p><p>テストがなんでこんなに長いのか不思議に思われると思いますが、それなりの理由はあります。</p><p>各 STL コンテナには特性がありまして、特に std::vector は変り種です。</p><p>std::vector は可変長ベクターなので、一定サイズの配列を確保して、それが超えそうになったら、リサイズをして拡張します。</p><p>この拡張は reserve() 関数を使い、その後にコピーを行います。</p><p>これをテストするために以下のようなテストコードにしてみました。</p><pre class="programlisting">225   std::cout &lt;&lt; "//// std::vector&lt;int&gt; の動作確認 " &lt;&lt; '\n';
+</p><p>テストがなんでこんなに長いのか不思議に思われると思いますが、それなりの理由はあります。</p><p>各 STL コンテナには特性がありまして、特に std::vector は変り種です。</p><p>std::vector は可変長ベクターなので、一定サイズの配列を確保して、それが超えそうになったら、リサイズをして拡張します。</p><p>この拡張は reserve() 関数を使い、その後にコピーを行います。</p><p>これをテストするために以下のようなテストコードにしてみました。</p><pre xmlns="" class="prettyprint">225   std::cout &lt;&lt; "//// std::vector&lt;int&gt; の動作確認 " &lt;&lt; '\n';
 226   std::vector&lt;int,int_allocator&gt; vec;
 227   std::cout &lt;&lt; "============= push_back(10)" &lt;&lt; '\n';
 228   vec.push_back(10);
@@ -600,7 +604,7 @@ deallocate: 0x556da7aff204 with size 64</pre><p>
 265   std::cout &lt;&lt; "============= emplace_back(1,2,3,4)" &lt;&lt; '\n';
 266   vec2.emplace_back(1,2,3,4);
 267   std::cout &lt;&lt; "============= emplace_back(5,6,7,8)" &lt;&lt; '\n';
-268   vec2.emplace_back(5,6,7,8);</pre><p>2 回の reserve() 関数へのコールをおこなっています。</p><pre class="programlisting">//// std::vector&lt;int&gt; の動作確認
+268   vec2.emplace_back(5,6,7,8);</pre><p>2 回の reserve() 関数へのコールをおこなっています。</p><pre xmlns="" class="prettyprint">//// std::vector&lt;int&gt; の動作確認
 ============= push_back(10)
 request size: 4
 size / block size / pool size = 1/8/1
@@ -633,7 +637,7 @@ construct 0x556da7aff20c
 destroy 0x556da7aff1c4
 destroy 0x556da7aff1c8
 destroy 0x556da7aff1cc
-deallocate: 0x556da7aff1c4 with size 8</pre><p>この出力では reserve() 関数への呼び出しを行うことで construct() と destroy() が呼ばれていますね。</p><p>std::vector はアロケーターで適正なメモリー管理をしなくても、最初に reserve() 関数でメモリーを予め使用する予定以上の領域を割り当てとけば、動作をさせることは簡単です。</p><p>次に std::list も見てみましょう。</p><p>まずはテストコードです。</p><pre class="programlisting">270   std::cout &lt;&lt; "//// std::list&lt;int&gt; の動作確認 " &lt;&lt; '\n';
+deallocate: 0x556da7aff1c4 with size 8</pre><p>この出力では reserve() 関数への呼び出しを行うことで construct() と destroy() が呼ばれていますね。</p><p>std::vector はアロケーターで適正なメモリー管理をしなくても、最初に reserve() 関数でメモリーを予め使用する予定以上の領域を割り当てとけば、動作をさせることは簡単です。</p><p>次に std::list も見てみましょう。</p><p>まずはテストコードです。</p><pre xmlns="" class="prettyprint">270   std::cout &lt;&lt; "//// std::list&lt;int&gt; の動作確認 " &lt;&lt; '\n';
 271   std::list&lt;int,int_allocator&gt; lst;
 272   std::cout &lt;&lt; "============= push_back(10)" &lt;&lt; '\n';
 273   lst.push_back(10);
@@ -652,7 +656,7 @@ deallocate: 0x556da7aff1c4 with size 8</pre><p>この出力では reserve() 関�
 286   std::cout &lt;&lt; "============= data: ";
 287   for(auto const&amp; x : lst)
 288     std::cout &lt;&lt; x &lt;&lt; " ";
-289   std::cout &lt;&lt; '\n';</pre><p>このテストコードを実行すると以下のように出力します。</p><pre class="programlisting">//// std::list&lt;int&gt; の動作確認
+289   std::cout &lt;&lt; '\n';</pre><p>このテストコードを実行すると以下のように出力します。</p><pre xmlns="" class="prettyprint">//// std::list&lt;int&gt; の動作確認
 ============= push_back(10)
 request size: 24
 size / block size / pool size = 1/32/1
@@ -679,7 +683,7 @@ deallocate: 0x556da7ba16fc with size 1
 request size: 24
 reuse free address: 0x556da7ba16fc
 construct 0x556da7ba170c
-============= data: 100 10 30</pre><p>前の項目で説明した通り std::list のリクエストサイズは 24 バイトになってますね。</p><p>双方向連結リストなので 2 個のポインターとデータサイズが最低でも必要ですが、それにデータパディングも入ってるのは間違いなさそうです。</p><p>最後に std::map もチェックしてみましょう。</p><pre class="programlisting">291   using map_allocator = block_allocator&lt;std::pair&lt;const int,int&gt;&gt;;
+============= data: 100 10 30</pre><p>前の項目で説明した通り std::list のリクエストサイズは 24 バイトになってますね。</p><p>双方向連結リストなので 2 個のポインターとデータサイズが最低でも必要ですが、それにデータパディングも入ってるのは間違いなさそうです。</p><p>最後に std::map もチェックしてみましょう。</p><pre xmlns="" class="prettyprint">291   using map_allocator = block_allocator&lt;std::pair&lt;const int,int&gt;&gt;;
 292
 293   map_allocator palloc;
 294   std::less&lt;int&gt; comp;
@@ -707,7 +711,7 @@ construct 0x556da7ba170c
 316   std::cout &lt;&lt; "============= data: ";
 317   for(auto const&amp; x : m)
 318     std::cout &lt;&lt; x.second &lt;&lt; " ";
-319   std::cout &lt;&lt; '\n';</pre><p>std::map のテストでは (2,4), (3,5) ペアを挿入してから (2,4) を削除します。</p><p>次に (4,6), (7,8) を挿入してから (4,6) を削除します。</p><p>最後に (9,10) ペアを挿入します。</p><p>この結果は以下のように出力されます。</p><pre class="programlisting">//// std::map&lt;int,int&gt; の動作確認
+319   std::cout &lt;&lt; '\n';</pre><p>std::map のテストでは (2,4), (3,5) ペアを挿入してから (2,4) を削除します。</p><p>次に (4,6), (7,8) を挿入してから (4,6) を削除します。</p><p>最後に (9,10) ペアを挿入します。</p><p>この結果は以下のように出力されます。</p><pre xmlns="" class="prettyprint">//// std::map&lt;int,int&gt; の動作確認
 ============= insert({2,4})
 request size: 40
 size / block size / pool size = 1/256/1
@@ -735,9 +739,9 @@ deallocate: 0x556da7bf793c with size 1
 request size: 40
 reuse free address: 0x556da7bf793c
 construct 0x556da7bf795c
-============= data: 5 8 10</pre><p>(3,5), (7,8), (9,10) が残っているので正常に動作していることが分かります。</p><p>リクエストサイズやプールサイズは以下の箇所だけを見ると良いです。</p><pre class="programlisting">============= insert({2,4})
+============= data: 5 8 10</pre><p>(3,5), (7,8), (9,10) が残っているので正常に動作していることが分かります。</p><p>リクエストサイズやプールサイズは以下の箇所だけを見ると良いです。</p><pre xmlns="" class="prettyprint">============= insert({2,4})
 request size: 40
-size / block size / pool size = 1/256/1</pre><p>またデータサイズは 40 バイトになっているので、これまた正しい値になっていますね。</p><p>セレクターについては 256 バイト均等間隔のアロケーターの allocate() を実行しています。</p><pre class="programlisting">110   inline pointer allocate(size_type n, typename std::allocator&lt;T&gt;::const_pointer = 0)
+size / block size / pool size = 1/256/1</pre><p>またデータサイズは 40 バイトになっているので、これまた正しい値になっていますね。</p><p>セレクターについては 256 バイト均等間隔のアロケーターの allocate() を実行しています。</p><pre xmlns="" class="prettyprint">110   inline pointer allocate(size_type n, typename std::allocator&lt;T&gt;::const_pointer = 0)
 111   {
 112     size_t s = sizeof(T);
 113     std::printf("request size: %lu\n",s);
@@ -750,4 +754,4 @@ size / block size / pool size = 1/256/1</pre><p>またデータサイズは 40 �
 120       return reinterpret_cast&lt;T*&gt;(S_alloc32_.allocate(n));
 121     else
 122       return reinterpret_cast&lt;T*&gt;(S_alloc256_.allocate(n));
-123   }</pre><p>40 バイトは 32 バイトを超えるので、次のアロケーターは 256 バイトアロケーターになりますよね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch100.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt12.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="pt13.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+123   }</pre><p>40 バイトは 32 バイトを超えるので、次のアロケーターは 256 バイトアロケーターになりますよね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch100.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt12.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="pt13.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

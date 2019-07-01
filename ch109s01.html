@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>109.1. ポリモーフィックアロケーターの実装</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch109.html" title="第109章 std::pmr::polymorphic_allocator の動作チェック" /><link rel="prev" href="ch109.html" title="第109章 std::pmr::polymorphic_allocator の動作チェック" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch109.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> </td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_ポリモーフィックアロケーターの実装"></a>109.1. ポリモーフィックアロケーターの実装</h2></div></div></div><p>　memory_resource には std::pair に対しての処理が入っていなかったですね。</p><p>　おんや？　これで良いんだべ？</p><p>　とか疑問に思った読者もいるでしょう。</p><p>　はい、std::pair 引数の受付は memory_resource ではなく polymorphic_allocator によって、実装されています。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>109.1. ポリモーフィックアロケーターの実装</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="ch109.html" title="第109章 std::pmr::polymorphic_allocator の動作チェック" /><link rel="prev" href="ch109.html" title="第109章 std::pmr::polymorphic_allocator の動作チェック" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch109.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> </td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_ポリモーフィックアロケーターの実装"></a>109.1. ポリモーフィックアロケーターの実装</h2></div></div></div><p>　memory_resource には std::pair に対しての処理が入っていなかったですね。</p><p>　おんや？　これで良いんだべ？</p><p>　とか疑問に思った読者もいるでしょう。</p><p>　はい、std::pair 引数の受付は memory_resource ではなく polymorphic_allocator によって、実装されています。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 uses_allocator.h
 </li><li class="listitem">
 memory_resource
 </li></ul></div><p>　この 2 つのヘッダーが良くも悪くも、今の実装状況ということになるかと思います。</p><p><strong>uses_allocator.h (<a class="ulink" href="https://github.com/MacKomatsu/gcc/blob/master/libstdc%2B%2B-v3/include/bits/uses_allocator.h" target="_top">https://github.com/MacKomatsu/gcc/blob/master/libstdc%2B%2B-v3/include/bits/uses_allocator.h</a>). </strong>
-</p><pre class="programlisting"> 55   template&lt;typename _Tp, typename _Alloc, typename = __void_t&lt;&gt;&gt;
+</p><pre xmlns="" class="prettyprint"> 55   template&lt;typename _Tp, typename _Alloc, typename = __void_t&lt;&gt;&gt;
  56     struct __uses_allocator_helper
  57     : false_type { };
  58
@@ -66,7 +70,7 @@ memory_resource
 114       return __ret;
 115     }</pre><p>
 </p><p>　ポリモーフィックアロケーターのソースコードは以下の通りです。</p><p><strong>polymorphic_allocator クラス (<a class="ulink" href="https://github.com/MacKomatsu/gcc/blob/master/libstdc%2B%2B-v3/include/experimental/memory_resource" target="_top">https://github.com/MacKomatsu/gcc/blob/master/libstdc%2B%2B-v3/include/experimental/memory_resource</a>). </strong>
-</p><pre class="programlisting">115   // 8.6 Class template polymorphic_allocator
+</p><pre xmlns="" class="prettyprint">115   // 8.6 Class template polymorphic_allocator
 116   template &lt;class _Tp&gt;
 117     class polymorphic_allocator
 118     {
@@ -197,7 +201,7 @@ memory_resource
 243
 244       memory_resource* _M_resource;
 245     };</pre><p>
-</p><p>　はーいはい、これまでの本書の蓄積があれば、ソースの分かりみが深いはずです。</p><p>　ですよね？</p><p>　std::pair 対策もきっちりやっていますし、筆者のサンプルコードと違って非の打ち所の無い完璧なコードです。</p><p>　他の pmr コンテナについては以下のような定義となると思いますが 2019 年の段階で使えるかは、まだ試していないので分かりませんね。</p><pre class="programlisting">namespace pmr {
+</p><p>　はーいはい、これまでの本書の蓄積があれば、ソースの分かりみが深いはずです。</p><p>　ですよね？</p><p>　std::pair 対策もきっちりやっていますし、筆者のサンプルコードと違って非の打ち所の無い完璧なコードです。</p><p>　他の pmr コンテナについては以下のような定義となると思いますが 2019 年の段階で使えるかは、まだ試していないので分かりませんね。</p><pre xmlns="" class="prettyprint">namespace pmr {
     template &lt;class T&gt;
     using list = std::list&lt;T, std::pmr::polymorphic_allocator&lt;T&gt;&gt;;
 }
@@ -250,4 +254,4 @@ namespace pmr {
               class Pred = std::equal_to&lt;Key&gt;&gt;
     using unordered_multiset = std::unordered_multiset&lt;Key, Hash, Pred,
                                    std::pmr::polymorphic_allocator&lt;Key&gt;&gt;
-}</pre><p>　まだ実験的なものという理解なんで、これを使用しているコードを見る機会はあまり無いと思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch109.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch109.html">上に戻る</a></td><td width="40%" align="right"> </td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+}</pre><p>　まだ実験的なものという理解なんで、これを使用しているコードを見る機会はあまり無いと思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch109.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch109.html">上に戻る</a></td><td width="40%" align="right"> </td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

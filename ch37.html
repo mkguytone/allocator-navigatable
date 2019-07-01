@@ -1,20 +1,24 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第37章 ビンのインデックスの計算</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch36.html" title="第36章 未整理ビン / スモールビン / ラージビン" /><link rel="next" href="ch37s01.html" title="37.1. 32 ビットアーキテクチャのビン" /><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch36.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch37s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_ビンのインデックスの計算"></a>第37章 ビンのインデックスの計算</h2></div></div></div><p>　ビンのインデックスの計算は、想像するより複雑になっています。</p><p>　なので、ちょこっと説明をさせて頂きますね。</p><p>　まずインデックスを計算するために必要な環境変数を malloc.c のソースコードを読みながら考えてきましょう。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc-internal.h）. </strong>
-</p><pre class="programlisting"> 54 #ifndef INTERNAL_SIZE_T
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8" /><title>第37章 ビンのインデックスの計算</title><link rel="stylesheet" type="text/css" href="docbook-xsl.css" /><meta name="generator" content="DocBook XSL Stylesheets V1.79.1" /><link rel="home" href="index.html" title="Linux で C/C++ の足固め： Linux の メモリー/ファイル/mmap と C++ アロケーター" /><link rel="up" href="pt04.html" title="パート IV. glibc から malloc() の基本構造を理解してみる" /><link rel="prev" href="ch36.html" title="第36章 未整理ビン / スモールビン / ラージビン" /><link rel="next" href="ch37s01.html" title="37.1. 32 ビットアーキテクチャのビン" /><script xmlns="" type="text/javascript" src="prettify/prettify.js"></script><link xmlns="" rel="stylesheet" type="text/css" href="prettify/skins/sons-of-obsidian.css" /><script xmlns="">
+    window.addEventListener("load", function() {
+      PR.prettyPrint();
+	  });	
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch36.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch37s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_ビンのインデックスの計算"></a>第37章 ビンのインデックスの計算</h2></div></div></div><p>　ビンのインデックスの計算は、想像するより複雑になっています。</p><p>　なので、ちょこっと説明をさせて頂きますね。</p><p>　まずインデックスを計算するために必要な環境変数を malloc.c のソースコードを読みながら考えてきましょう。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc-internal.h）. </strong>
+</p><pre xmlns="" class="prettyprint"> 54 #ifndef INTERNAL_SIZE_T
  55 # define INTERNAL_SIZE_T size_t
  56 #endif
  57
  58 /* The corresponding word size.  */
  59 #define SIZE_SZ (sizeof (INTERNAL_SIZE_T))</pre><p>
 </p><p>　SIZE_SZ は size_t 型のバイトサイズと同じです。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
-</p><pre class="programlisting">1460 #define NBINS             128
+</p><pre xmlns="" class="prettyprint">1460 #define NBINS             128
 1461 #define NSMALLBINS         64
 1462 #define SMALLBIN_WIDTH    MALLOC_ALIGNMENT
 1463 #define SMALLBIN_CORRECTION (MALLOC_ALIGNMENT &gt; 2 * SIZE_SZ)
 1464 #define MIN_LARGE_SIZE    ((NSMALLBINS - SMALLBIN_CORRECTION) * SMALLBIN_WIDTH)
 1465</pre><p>
 </p><p>　64 ビットアーキテクチャだと size_t のサイズは 8 バイトになるはずですから MALLOC_ALIGNMENT は 16 となり SIZE_SZ は 8 となりますね。</p><p>　であれば MIN_LARGE_SIZE は (64 - 0) * 16 = 1024 となります。</p><p>　32 ビットアーキテクチャだと size_t のサイズは 4 バイトだとして MALLOC_ALIGNMENT は 8 バイトになり SIZE_SZ は 4 になります。</p><p>　その場合の MIN_LARGE_SIZE は (64 - 0) * 8 = 512 です。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
-</p><pre class="programlisting">1466 #define in_smallbin_range(sz)  \
+</p><pre xmlns="" class="prettyprint">1466 #define in_smallbin_range(sz)  \
 1467   ((unsigned long) (sz) &lt; (unsigned long) MIN_LARGE_SIZE)
 1468
 1469 #define smallbin_index(sz) \
@@ -22,7 +26,7 @@
 1471    + SMALLBIN_CORRECTION)
 1472</pre><p>
 </p><p>　in_smallbin_range は Small bin の範囲内にあるかチェックするマクロです。</p><p>　つまり 64 ビットアーキテクチャだと 1024 バイトが範囲内となります。</p><p>　Small Bin か否かは「 sz &lt; MIN_LARGE_SIZE 」の結果によって決定されるってことです。</p><p>　smallbin_index(sz) は MALLOC_ALIGNMENT が 16 バイトであれば「 sz ÷ 16 」になりますね。</p><p>　16, 32, 48, 64, …, 1008 バイトてな感じになるはずです。</p><p>　1008 は 1024 - 16 の意味です。</p><p>　最大値と一緒になると微妙なので…　(´・ω・｀)</p><p>　MALLOC_ALIGNMNET が 8 バイトなら「 sz ÷ 8 」となり、インデックスの間隔がアーキテクチャによって変動します。</p><p>　16, 24, 32, 40, 48, …, 504 バイトでしょうかね…</p><p>　最後の値は単に最大値が 512 なので、その直前の 8 の倍数をとっただけです。</p><p>　これに smallbin_index(sz) を使ってインデックスに翻訳すると 1, 2, 3, …, 63 でしょうかね。</p><p>　次は Large bin のインデックスの計算を見てみましょう。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
-</p><pre class="programlisting">1473 #define largebin_index_32(sz)                                                \
+</p><pre xmlns="" class="prettyprint">1473 #define largebin_index_32(sz)                                                \
 1474   (((((unsigned long) (sz)) &gt;&gt; 6) &lt;= 38) ?  56 + (((unsigned long) (sz)) &gt;&gt; 6) :\
 1475    ((((unsigned long) (sz)) &gt;&gt; 9) &lt;= 20) ?  91 + (((unsigned long) (sz)) &gt;&gt; 9) :\
 1476    ((((unsigned long) (sz)) &gt;&gt; 12) &lt;= 10) ? 110 + (((unsigned long) (sz)) &gt;&gt; 12) :\
@@ -54,4 +58,4 @@
 1502    : MALLOC_ALIGNMENT == 16 ? largebin_index_32_big (sz)                     \
 1503    : largebin_index_32 (sz))
 1504</pre><p>
-</p><p>　それで Large bin のインデックスを計算してくれるマクロは large_bin_index(sz) となります。</p><p>　64 ビットアーキテクチャだと large_bin_index_64 マクロを実行します。</p><p>　32 ビットアーキテクチャでアラインメントが 16 バイトなら largebin_index_32_big(sz) をマクロを実行ですね。</p><p>　最後に 32 ビットアーキテクチャで 16 バイトでないなら largebin_index_32(sz) マクロを使います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch36.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch37s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div></body></html>
+</p><p>　それで Large bin のインデックスを計算してくれるマクロは large_bin_index(sz) となります。</p><p>　64 ビットアーキテクチャだと large_bin_index_64 マクロを実行します。</p><p>　32 ビットアーキテクチャでアラインメントが 16 バイトなら largebin_index_32_big(sz) をマクロを実行ですね。</p><p>　最後に 32 ビットアーキテクチャで 16 バイトでないなら largebin_index_32(sz) マクロを使います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch36.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt04.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch37s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>
