@@ -108,13 +108,13 @@
 </p><pre xmlns="" class="prettyprint">$ g++ main.cpp -std=c++17
 $ ./a.out
 1000
-deallocated</pre><p>　このソースコードではアロケーターではなく、スマートポインターが主役です。</p><p>　アロケーターをスマートポインターにするのではなく、アロケーターで割り当てたメモリー領域をスマートポインターとして自動で解放するのがコードの目的だからです。</p><p>　まずアロケーターをリバインドするための型を作っておきます。</p><pre xmlns="" class="prettyprint"> 62 template&lt;typename Allocator, typename U&gt;
+deallocated</pre><p>このソースコードではアロケーターではなく、スマートポインターが主役です。</p><p>アロケーターをスマートポインターにするのではなく、アロケーターで割り当てたメモリー領域をスマートポインターとして自動で解放するのがコードの目的だからです。</p><p>まずアロケーターをリバインドするための型を作っておきます。</p><pre xmlns="" class="prettyprint"> 62 template&lt;typename Allocator, typename U&gt;
  63 struct my_rebind {
  64   using type = typename Allocator::template rebind&lt;U&gt;::other;
  65 };
  66
  67 template&lt;typename Allocator, typename U&gt;
- 68 using my_rebind_t = typename my_rebind&lt;Allocator,U&gt;::type;</pre><p>　my_rebind_t がアロケーターの型エイリアス（別名）となります。</p><p>　次にデリーターのクラステンプレート my_delete を用意します。</p><pre xmlns="" class="prettyprint"> 70 template&lt;typename Allocator, typename T&gt;
+ 68 using my_rebind_t = typename my_rebind&lt;Allocator,U&gt;::type;</pre><p>my_rebind_t がアロケーターの型エイリアス（別名）となります。</p><p>次にデリーターのクラステンプレート my_delete を用意します。</p><pre xmlns="" class="prettyprint"> 70 template&lt;typename Allocator, typename T&gt;
  71 class my_delete
  72 {
  73 public:
@@ -129,16 +129,16 @@ deallocated</pre><p>　このソースコードではアロケーターではな
  82   }
  83 private:
  84   mutable my_rebind_t&lt;Allocator,T&gt; M_allocator_;
- 85 };</pre><p>　この中でデリーターの解放箇所を実装するのは void operator(T* p) となりますが、スマートポインターが削除時にコールします。</p><p>　後は my_rebind_t 型のインスタンスを my_delete クラス内に保持させます。</p><pre xmlns="" class="prettyprint"> 84   mutable my_rebind_t&lt;Allocator,T&gt; M_allocator_;</pre><p>　後は std::unique_ptr のテンプレート引数に放り込むだけです。</p><pre xmlns="" class="prettyprint"> 87 template&lt;typename T,typename Allocator&gt;
- 88 using my_smart_ptr = std::unique_ptr&lt;T,my_delete&lt;Allocator,T&gt;&gt;;</pre><p>　やっと std::unique_ptr のご登場となりますが my_delete はテンプレート引数に指定されてますね。</p><p>　my_smart_ptr としてエイリアスにし、識別子を短縮すれば後は、使うだけです。</p><pre xmlns="" class="prettyprint"> 92   my_allocator&lt;int&gt; alloc;
+ 85 };</pre><p>この中でデリーターの解放箇所を実装するのは void operator(T* p) となりますが、スマートポインターが削除時にコールします。</p><p>後は my_rebind_t 型のインスタンスを my_delete クラス内に保持させます。</p><pre xmlns="" class="prettyprint"> 84   mutable my_rebind_t&lt;Allocator,T&gt; M_allocator_;</pre><p>後は std::unique_ptr のテンプレート引数に放り込むだけです。</p><pre xmlns="" class="prettyprint"> 87 template&lt;typename T,typename Allocator&gt;
+ 88 using my_smart_ptr = std::unique_ptr&lt;T,my_delete&lt;Allocator,T&gt;&gt;;</pre><p>やっと std::unique_ptr のご登場となりますが my_delete はテンプレート引数に指定されてますね。</p><p>my_smart_ptr としてエイリアスにし、識別子を短縮すれば後は、使うだけです。</p><pre xmlns="" class="prettyprint"> 92   my_allocator&lt;int&gt; alloc;
  93   my_rebind_t&lt;my_allocator&lt;long&gt;,long&gt; rebound_alloc(alloc);
  94   long* p_raw = rebound_alloc.allocate(1);
  95   long* result = new (p_raw) long(1000);
  96   {
  97     auto p = my_smart_ptr&lt;long,my_allocator&lt;long&gt;&gt;(result,my_delete&lt;my_allocator&lt;long&gt;,long&gt;(rebound_alloc));
  98     std::cout &lt;&lt; *p &lt;&lt; '\n';
- 99   }</pre><p>　これちょっと遠回しに見えるかもしれませんので、少し詳しく説明してきます。</p><p>　最初にアロケーターのインスタンスを作りますが、型を変えるのであれば、それをリバインド型としてコピーします。</p><pre xmlns="" class="prettyprint"> 92   my_allocator&lt;int&gt; alloc;
- 93   my_rebind_t&lt;my_allocator&lt;long&gt;,long&gt; rebound_alloc(alloc);</pre><p>　アロケーターを int 型から long 型に変更（リバインド）しているってことです。</p><p>　次にリバインドしたアロケーターからメモリー割り当てを行ってアドレスを取得します。</p><pre xmlns="" class="prettyprint"> 94   long* p_raw = rebound_alloc.allocate(1);</pre><p>　そのアドレスに対してデータの初期化をします。</p><pre xmlns="" class="prettyprint"> 95   long* result = new (p_raw) long(1000);</pre><p>　この行は construct() を実装していれば、 construct() をコールしてもＯＫです。</p><p>　最後に割り当て済みのデータを my_smart_ptr のインスタンス生成のパラペーターとして使います。</p><pre xmlns="" class="prettyprint"> 96   {
+ 99   }</pre><p>これちょっと遠回しに見えるかもしれませんので、少し詳しく説明してきます。</p><p>最初にアロケーターのインスタンスを作りますが、型を変えるのであれば、それをリバインド型としてコピーします。</p><pre xmlns="" class="prettyprint"> 92   my_allocator&lt;int&gt; alloc;
+ 93   my_rebind_t&lt;my_allocator&lt;long&gt;,long&gt; rebound_alloc(alloc);</pre><p>アロケーターを int 型から long 型に変更（リバインド）しているってことです。</p><p>次にリバインドしたアロケーターからメモリー割り当てを行ってアドレスを取得します。</p><pre xmlns="" class="prettyprint"> 94   long* p_raw = rebound_alloc.allocate(1);</pre><p>そのアドレスに対してデータの初期化をします。</p><pre xmlns="" class="prettyprint"> 95   long* result = new (p_raw) long(1000);</pre><p>この行は construct() を実装していれば、 construct() をコールしてもＯＫです。</p><p>最後に割り当て済みのデータを my_smart_ptr のインスタンス生成のパラメーターとして使います。</p><pre xmlns="" class="prettyprint"> 96   {
  97     auto p = my_smart_ptr&lt;long,my_allocator&lt;long&gt;&gt;(result,my_delete&lt;my_allocator&lt;long&gt;,long&gt;(rebound_alloc));
  98     std::cout &lt;&lt; *p &lt;&lt; '\n';
- 99   }</pre><p>　まあ、こんな感じで、スマートポインターとして使えるようになりましたとさ（昔話感）。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pt08.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt08.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="pt09.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>
+ 99   }</pre><p>まあ、こんな感じで、スマートポインターとして使えるようになりましたとさ（昔話感）。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="pt08.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt08.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="pt09.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

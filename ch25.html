@@ -3,9 +3,9 @@
     window.addEventListener("load", function() {
       PR.prettyPrint();
 	  });	
-	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch24.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch25s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_malloc_を_strace_で検証してみる"></a>第25章 malloc を strace で検証してみる</h2></div></div></div><p>　malloc って裏で何してんでしょうね？</p><p>　まあ興味もったってプログラマーには影響ないんでしょう…　ええ…　(´・ω・｀)</p><p>　確かに強いプログラマーのブログとか読むと glibc とか dlmalloc のアルゴリズムとか完全理解した高位階の魔術を駆使したウィザードリーをチラ見すると、「はえー、すげえ、草」といった感想しかないでしょう…</p><p>　わかります…　(´・ω・｀)</p><p>　仰られる通り通常のプログラマーには不要な技術ではありますが、表層的にではあっても検証してみると以外に楽しかったりしますんで、やってみましょう。</p><p>　まずは空のプログラムをビルドしてみましょう。</p><p><strong>empty.c. </strong>
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch24.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch25s01.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_malloc_を_strace_で検証してみる"></a>第25章 malloc を strace で検証してみる</h2></div></div></div><p>malloc って裏で何してんでしょうね？</p><p>まあ興味もったってプログラマーには影響ないんでしょう…　ええ…　</p><p>(´・ω・｀)</p><p>確かに強いプログラマーのブログとか読むと glibc とか dlmalloc のアルゴリズムとか完全理解した高位階の魔術を駆使したウィザードリーをチラ見すると、「はえー、すげえ、草」といった感想しかないでしょう…</p><p>わかります…　(´・ω・｀)</p><p>仰られる通り通常のプログラマーには不要な技術ではありますが、表層的にではあっても検証してみると以外に楽しかったりしますんで、やってみましょう。</p><p>まずは空のプログラムをビルドしてみましょう。</p><p><strong>empty.c. </strong>
 </p><pre xmlns="" class="prettyprint">  1 int main(){}</pre><p>
-</p><p>　ビルドしたバイナリを strace すると以下のようになります。</p><pre xmlns="" class="prettyprint">$ gcc empty.c -g
+</p><p>ビルドしたバイナリを strace すると以下のようになります。</p><pre xmlns="" class="prettyprint">$ gcc empty.c -g
 $ strace ./a.out
 execve("./a.out", ["./a.out"], 0x7fff8c9cf800 /* 57 vars */) = 0
 brk(NULL)                               = 0x55672d205000
@@ -50,7 +50,7 @@ mprotect(0x7f50d732f000, 4096, PROT_READ) = 0
 munmap(0x7f50d730d000, 127214)          = 0
 ioctl(2, TCGETS, {B38400 opost isig icanon echo ...}) = 0
 exit_group(0)                           = ?
-+++ exited with 0 +++</pre><p>　この出力内容では意味不明でしょうが malloc() のコールを追加して見ると良いでしょう。</p><p><strong>main.c. </strong>
++++ exited with 0 +++</pre><p>この出力内容では意味不明でしょうが malloc() のコールを追加して見ると良いでしょう。</p><p><strong>main.c. </strong>
 </p><pre xmlns="" class="prettyprint">  1 #include &lt;stdlib.h&gt;
   2 #include &lt;stdio.h&gt;
   3
@@ -60,7 +60,7 @@ exit_group(0)                           = ?
   7   free(ptr);
   8   return 0;
   9 }</pre><p>
-</p><p>　ビルドした実行可能ファイルに strace をした結果を比較すれば malloc() のコールの内部実装がわかろうというものです。</p><p>　ではやってみましょう。</p><pre xmlns="" class="prettyprint">$ gcc main.c -g
+</p><p>ビルドした実行可能ファイルに strace をした結果を比較すれば malloc() のコールの内部実装がわかろうというものです。</p><p>ではやってみましょう。</p><pre xmlns="" class="prettyprint">$ gcc main.c -g
 $ strace ./a.out
 execve("./a.out", ["./a.out"], 0x7fffa58495b0 /* 57 vars */) = 0
 brk(NULL)                               = 0x55620ea32000
@@ -107,5 +107,5 @@ ioctl(2, TCGETS, {B38400 opost isig icanon echo ...}) = 0
 brk(NULL)                               = 0x55620ea32000
 brk(0x55620ea53000)                     = 0x55620ea53000
 exit_group(0)                           = ?
-+++ exited with 0 +++</pre><p>　2 つを比べると最後のほうに2行だけ追加されています。</p><pre xmlns="" class="prettyprint">brk(NULL)                               = 0x55620ea32000
-brk(0x55620ea53000)                     = 0x55620ea53000</pre><p>　後で詳しめに説明しますが brk() はヒープ領域のアドレス取得や、割り当てを行う関数です。</p><p>　brk(NULL) は現在のヒープ領域の終端アドレス、そして brk(0x55620ea53000) は 「 0x55620ea32000 」 から 「 0x55620ea53000 」にヒープのアドレスを拡大しています。</p><p>　つまり malloc のやっていること</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch24.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt03.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch25s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>
++++ exited with 0 +++</pre><p>2 つを比べると最後のほうに2行だけ追加されています。</p><pre xmlns="" class="prettyprint">brk(NULL)                               = 0x55620ea32000
+brk(0x55620ea53000)                     = 0x55620ea53000</pre><p>後で詳しめに説明しますが brk() はヒープ領域のアドレス取得や、割り当てを行う関数です。</p><p>brk(NULL) は現在のヒープ領域の終端アドレス、そして brk(0x55620ea53000) は 「 0x55620ea32000 」 から 「 0x55620ea53000 」にヒープのアドレスを拡大していますね。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch24.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt03.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch25s01.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

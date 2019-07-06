@@ -4,15 +4,15 @@
       PR.prettyPrint();
 	  });	
 	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch22.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch23.html">次へ</a></td></tr></table><hr /></div><div class="part"><div class="titlepage"><div><div><h1 class="title"><a id="_linux_でメモリー割り当て"></a>パート III. Linux でメモリー割り当て</h1></div></div></div><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
-とにかく malloc だけ覚えればよし（ free もお忘れなく）
+とにかく malloc() だけ覚えればよし（ free() もお忘れなく）
 </li><li class="listitem">
 メモリーレイアウトのチェックには GDB の info proc mappings コマンドを使える
 </li><li class="listitem">
-brk/sbrk 関数を使えばローレベルでヒープ領域を制御可能だが、使用する機会はまずない（ちなみに大きめのメモリー割り当てには mmap が使われる）
+brk()/sbrk() 関数を使えばローレベルでヒープ領域を制御可能だが、使用する機会はまずない（ちなみに大きめのメモリー割り当てには mmap が使われる）
 </li><li class="listitem">
-realloc を使えば領域の使い回しができる
+realloc() を使えば領域の使い回しができる
 </li><li class="listitem">
-posix_memalign や memalign でアラインメントを取れる
+posix_memalign() や memalign() でアラインメントを取れる
 </li><li class="listitem">
-alloca は早く割り当てができて解放が不要だが大きめのサイズは失敗しやすいしエラーも返さない
-</li></ul></div><p>　Linux でのメモリー割り当ては C 言語の malloc を覚えとけば良いですかねぇ……</p><p>　C++ で malloc を使うのであれば std::malloc になりますけど単に関数を C++ で使うためにラップしてるだけなんで、やってることは同じ…　はずです。</p><p>　はい……　(´・ω・｀)</p><p>　まあ筆者も普段は malloc しか意識していないので上から目線で説明なんてとてもできませぬ…</p><p>　ですがこの章では malloc およびその周辺のメモリー関数を紹介してきたいと思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch22.html">戻る</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="ch23.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>
+alloca() は早く割り当てができて解放が不要だが大きめのサイズは失敗しやすいしエラーも返さない
+</li></ul></div><p>Linux でのメモリー割り当ては C 言語の malloc を覚えとけば良いですかねぇ……</p><p>C++ で malloc を使うのであれば std::malloc になりますけど単に関数を C++ で使うためにラップしてるだけなんで、やってることは同じ…　はずです。</p><p>はい……　(´・ω・｀)</p><p>まあ筆者も普段は malloc しか意識していないので上から目線で説明なんてとてもできませぬ…</p><p>ですがこの章では malloc およびその周辺のメモリー関数を紹介してきたいと思います。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch22.html">戻る</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="ch23.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>

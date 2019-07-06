@@ -32,7 +32,7 @@
 1069   struct malloc_chunk* fd_nextsize; /* double links -- used only if free. */
 1070   struct malloc_chunk* bk_nextsize;
 1071 };</pre><p>
-</p><p>　mchunk_previous_size は前のチャンクのサイズですが、フリーリストの連結に使われます。</p><p>　mchunk_size は下 3 桁分をフラグに使ったチャンクサイズです。</p><p>　フラグについては以下の図を見てください。</p><div class="figure"><a id="idm1342"></a><p class="title"><strong>図32.1 割り当て済みチャンク（allocated chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/allocated_chunk.png" alt="img/allocated_chunk.png" /></div></div></div><br class="figure-break" /><p>　まあ構造は初めて見ると複雑に見えるかと思いますがね。</p><p>　それでフラグには以下の 3 種類が存在します。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+</p><p>　mchunk_previous_size は前のチャンクのサイズですが、フリーリストの連結に使われます。</p><p>　mchunk_size は下 3 桁分をフラグに使ったチャンクサイズです。</p><p>　フラグについては以下の図を見てください。</p><div class="figure"><a id="idm1345"></a><p class="title"><strong>図32.1 割り当て済みチャンク（allocated chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/allocated_chunk.png" alt="img/allocated_chunk.png" /></div></div></div><br class="figure-break" /><p>　まあ構造は初めて見ると複雑に見えるかと思いますがね。</p><p>　それでフラグには以下の 3 種類が存在します。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
 A(NON_MAIN_ARENA)
 </span></dt><dd>
 メインアリーナでない
@@ -59,7 +59,7 @@ P(PREV_INUSE)
 1102       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 1103       |             Size of next chunk, in bytes                |A|0|1|
 1104       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-*/</pre><p>　つまりユーザーデータはチャンクサイズのすぐ次に来ることになります。</p><div class="figure"><a id="idm1369"></a><p class="title"><strong>図32.2 割り当て済みチャンクの内部（allocated chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/allocated_chunk_data.png" alt="img/allocated_chunk_data.png" /></div></div></div><br class="figure-break" /><p>　割り当て済みの領域は malloc_chunk 構造体の疑似バージョンと言えるかもしれませんね。</p><p>　ユーザーデータを強引に入れたって感じです。</p><p>　反対にフリーチャンクは以下のように malloc_chunk 構造体のパラメーターをフル活用できます。</p><div class="figure"><a id="idm1379"></a><p class="title"><strong>図32.3 フリーチャンク（free chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/free_chunk.png" alt="img/free_chunk.png" /></div></div></div><br class="figure-break" /><p>　奇妙に感じられた方は malloc.c の以下のコメントをチェックしてみてくださいね。</p><pre xmlns="" class="prettyprint">/*
+*/</pre><p>　つまりユーザーデータはチャンクサイズのすぐ次に来ることになります。</p><div class="figure"><a id="idm1372"></a><p class="title"><strong>図32.2 割り当て済みチャンクの内部（allocated chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/allocated_chunk_data.png" alt="img/allocated_chunk_data.png" /></div></div></div><br class="figure-break" /><p>　割り当て済みの領域は malloc_chunk 構造体の疑似バージョンと言えるかもしれませんね。</p><p>　ユーザーデータを強引に入れたって感じです。</p><p>　反対にフリーチャンクは以下のように malloc_chunk 構造体のパラメーターをフル活用できます。</p><div class="figure"><a id="idm1382"></a><p class="title"><strong>図32.3 フリーチャンク（free chunk）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/free_chunk.png" alt="img/free_chunk.png" /></div></div></div><br class="figure-break" /><p>　奇妙に感じられた方は malloc.c の以下のコメントをチェックしてみてくださいね。</p><pre xmlns="" class="prettyprint">/*
 1116     chunk-&gt; +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 1117       |             Size of previous chunk, if unallocated (P clear)  |
 1118       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -77,7 +77,7 @@ P(PREV_INUSE)
 1130       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 1131       |             Size of next chunk, in bytes                |A|0|0|
 1132       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-*/</pre><p>　これを図に直すと以下のようになります。</p><div class="figure"><a id="idm1389"></a><p class="title"><strong>図32.4 フリーチャンクの内部（small free chunk、大きめでない場合）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/free_chunk_data.png" alt="img/free_chunk_data.png" /></div></div></div><br class="figure-break" /><p>　fd_nextsize と bk_nextsize は大きめのフリーチャンク（large free chunk）の時のみに使われるらしいです。</p><p>　なので小さめのフリーチャンク（small free chunk）の時には fd_nextsize と bk_nextsize は使われません。</p><p>　ちなみにフリーチャンクについては大きさによって、保存されるデータ構造が異なります。</p><p>　このチャンクを収納してくれるデータ構造を bin と呼びます。</p><p>　bin はポインターの配列ですが、</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+*/</pre><p>　これを図に直すと以下のようになります。</p><div class="figure"><a id="idm1392"></a><p class="title"><strong>図32.4 フリーチャンクの内部（small free chunk、大きめでない場合）</strong></p><div class="figure-contents"><div class="mediaobject"><img src="img/free_chunk_data.png" alt="img/free_chunk_data.png" /></div></div></div><br class="figure-break" /><p>　fd_nextsize と bk_nextsize は大きめのフリーチャンク（large free chunk）の時のみに使われるらしいです。</p><p>　なので小さめのフリーチャンク（small free chunk）の時には fd_nextsize と bk_nextsize は使われません。</p><p>　ちなみにフリーチャンクについては大きさによって、保存されるデータ構造が異なります。</p><p>　このチャンクを収納してくれるデータ構造を bin と呼びます。</p><p>　bin はポインターの配列ですが、</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 Fast bin
 </li><li class="listitem">
 Unsorted bin
