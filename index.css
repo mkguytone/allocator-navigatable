@@ -423,8 +423,9 @@ div.toclevel1 { margin-top: 0.2em; font-size: 16px; }
 div.toclevel2 { margin-top: 0.15em; font-size: 14px; }
 em, dt, td.hdlist1 { color: black; }
 strong { 
-color: #3E4349; 
-word-wrap: normal;
+  overflow: auto;
+  color: #3E4349; 
+  word-wrap: normal;
 }
 a { color: #004B6B; text-decoration: none; border-bottom: 1px dotted #004B6B; }
 a:visited { color: #615FA0; border-bottom: 1px dotted #615FA0; }
