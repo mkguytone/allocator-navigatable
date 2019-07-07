@@ -424,6 +424,7 @@ div.toclevel2 { margin-top: 0.15em; font-size: 14px; }
 em, dt, td.hdlist1 { color: black; }
 strong { 
   overflow: auto;
+	width: auto;
   color: #3E4349; 
   word-wrap: normal;
 }
