@@ -3,7 +3,7 @@
     window.addEventListener("load", function() {
       PR.prettyPrint();
 	  });	
-	</script><script xmlns="" type="text/javascript" src="script/head.js"></script><meta xmlns="" name="viewport" content="width=device-width, initial-scale=1" /></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch83.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt07.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_dev_zero"></a>第84章 /dev/zero</h2></div></div></div><p>　MAP_ANONYMOUS はファイルマッピング以外の大きめのマッピングに使うのですが、MAP_ANONYMOUS を使わなくても同様の効果を得る手法があります。</p><p>　それが /dev/zero のファイル記述子を mmap() の引数に指定する手法です。</p><p><strong>main.c. </strong>
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script><html:meta xmlns:html="http://www.w3.org/1999/xhtml" name="viewport" content="width=320, initial-scale=1"></html:meta></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch83.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt07.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_dev_zero"></a>第84章 /dev/zero</h2></div></div></div><p>　MAP_ANONYMOUS はファイルマッピング以外の大きめのマッピングに使うのですが、MAP_ANONYMOUS を使わなくても同様の効果を得る手法があります。</p><p>　それが /dev/zero のファイル記述子を mmap() の引数に指定する手法です。</p><p><strong>main.c. </strong>
 </p><pre xmlns="" class="prettyprint">  1 #include &lt;stdio.h&gt;
   2 #include &lt;stdlib.h&gt;
   3 #include &lt;unistd.h&gt;

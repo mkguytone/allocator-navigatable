@@ -3,7 +3,7 @@
     window.addEventListener("load", function() {
       PR.prettyPrint();
 	  });	
-	</script><script xmlns="" type="text/javascript" src="script/head.js"></script><meta xmlns="" name="viewport" content="width=device-width, initial-scale=1" /></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch35s01.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch37.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_未整理ビン_スモールビン_ラージビン"></a>第36章 未整理ビン / スモールビン / ラージビン</h2></div></div></div><p>　bins[] 配列は Unsorted / Small / Large の 3 つのビンに保管されるんですが、これはインデックスがあらかじめ定義されています。</p><pre xmlns="" class="prettyprint">1436 /*
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script><html:meta xmlns:html="http://www.w3.org/1999/xhtml" name="viewport" content="width=320, initial-scale=1"></html:meta></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch35s01.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch37.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_未整理ビン_スモールビン_ラージビン"></a>第36章 未整理ビン / スモールビン / ラージビン</h2></div></div></div><p>　bins[] 配列は Unsorted / Small / Large の 3 つのビンに保管されるんですが、これはインデックスがあらかじめ定義されています。</p><pre xmlns="" class="prettyprint">1436 /*
 1437    Indexing
 1438
 1439     Bins for sizes &lt; 512 bytes contain chunks of all the same size, spaced

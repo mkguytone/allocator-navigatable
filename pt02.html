@@ -3,7 +3,7 @@
     window.addEventListener("load", function() {
       PR.prettyPrint();
 	  });	
-	</script><script xmlns="" type="text/javascript" src="script/head.js"></script><meta xmlns="" name="viewport" content="width=device-width, initial-scale=1" /></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch16.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch17.html">次へ</a></td></tr></table><hr /></div><div class="part"><div class="titlepage"><div><div><h1 class="title"><a id="_linux_posix_のファイル入出力"></a>パート II. Linux (POSIX) のファイル入出力</h1></div></div></div><p>　Linux の入出力で初心者がすぐに学ぶ関数は printf とか puts とかですかね。</p><pre xmlns="" class="prettyprint">int printf(const char *format, ...);
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script><html:meta xmlns:html="http://www.w3.org/1999/xhtml" name="viewport" content="width=320, initial-scale=1"></html:meta></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch16.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch17.html">次へ</a></td></tr></table><hr /></div><div class="part"><div class="titlepage"><div><div><h1 class="title"><a id="_linux_posix_のファイル入出力"></a>パート II. Linux (POSIX) のファイル入出力</h1></div></div></div><p>　Linux の入出力で初心者がすぐに学ぶ関数は printf とか puts とかですかね。</p><pre xmlns="" class="prettyprint">int printf(const char *format, ...);
 int puts(const char *s);</pre><p>　使い方は以下のような感じになります。</p><p><strong>main.c. </strong>
 </p><pre xmlns="" class="prettyprint">  1 #include &lt;stdio.h&gt;
   2

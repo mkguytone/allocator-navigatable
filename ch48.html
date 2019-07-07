@@ -3,7 +3,7 @@
     window.addEventListener("load", function() {
       PR.prettyPrint();
 	  });	
-	</script><script xmlns="" type="text/javascript" src="script/head.js"></script><meta xmlns="" name="viewport" content="width=device-width, initial-scale=1" /></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch47.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch49.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_malloc_c_の内部関数"></a>第48章 malloc.c の内部関数</h2></div></div></div><p>malloc.c の内部関数で一番 malloc() のイメージにふさわしい仕事をするのが sysmalloc() 関数です。</p><pre xmlns="" class="prettyprint">2265 /*
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script><html:meta xmlns:html="http://www.w3.org/1999/xhtml" name="viewport" content="width=320, initial-scale=1"></html:meta></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch47.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch49.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_malloc_c_の内部関数"></a>第48章 malloc.c の内部関数</h2></div></div></div><p>malloc.c の内部関数で一番 malloc() のイメージにふさわしい仕事をするのが sysmalloc() 関数です。</p><pre xmlns="" class="prettyprint">2265 /*
 2266    sysmalloc handles malloc cases requiring more memory from the system.
 2267    On entry, it is assumed that av-&gt;top does not have enough
 2268    space to service request for nb bytes, thus requiring that av-&gt;top

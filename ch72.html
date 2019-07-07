@@ -3,7 +3,7 @@
     window.addEventListener("load", function() {
       PR.prettyPrint();
 	  });	
-	</script><script xmlns="" type="text/javascript" src="script/head.js"></script><meta xmlns="" name="viewport" content="width=device-width, initial-scale=1" /></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch71s06.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt06.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_stat_構造体"></a>第72章 stat 構造体</h2></div></div></div><p>　stat 構造体はファイルの情報を取得するための関数の引数として使用されます。</p><p>　まあステータス情報を保持するためのオブジェクトぐらいに考えておけば結構です。</p><p>　構造体の中身を見るまえにスターテスを取得する関数の宣言です。</p><pre xmlns="" class="prettyprint">#include &lt;sys/types.h&gt;
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script><html:meta xmlns:html="http://www.w3.org/1999/xhtml" name="viewport" content="width=320, initial-scale=1"></html:meta></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch71s06.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="pt06.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_stat_構造体"></a>第72章 stat 構造体</h2></div></div></div><p>　stat 構造体はファイルの情報を取得するための関数の引数として使用されます。</p><p>　まあステータス情報を保持するためのオブジェクトぐらいに考えておけば結構です。</p><p>　構造体の中身を見るまえにスターテスを取得する関数の宣言です。</p><pre xmlns="" class="prettyprint">#include &lt;sys/types.h&gt;
 #include &lt;sys/stat.h&gt;
 #include &lt;unistd.h&gt;
 
