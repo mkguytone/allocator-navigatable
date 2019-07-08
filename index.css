@@ -515,8 +515,8 @@ div.table, div.informaltable {
 }*/
 
 table,td,th {
-  border-collapse: separate;
-	border-spacing: 1px;
+  border-collapse: collapse;
+	border-spacing: 0;
   border:1px solid #333;
 }
 
@@ -548,7 +548,8 @@ div.informaltable table tr:nth-of-type(even) {
 */
 
 div.informaltable td, div.informaltable th {
-	border-collapse: collapse;
+	border-collapse: separate;
+	border-spacing: 1px;
   border: 1px solid #333;
 }
 
