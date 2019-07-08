@@ -640,48 +640,6 @@ div.navfooter tr td {
   font-size: 120%;
 };
 
-section table { width: 100%; }
-section th, section td  { i
-  padding: 10px; border: 1px solid #ddd; 
-}
-section th  { background: #f4f4f4; }
- 
-/*----------------------------------------------------
-  .demo02
-----------------------------------------------------*/
-.table th  { width: 13%; }
-.table td  { text-align: center; }
-.table td:first-child  { text-align: left; }
-@media only screen and (max-width: 800px) { 
-  .table { 
-    display: block; 
-    width: 100%; 
-    margin: 0 -10px;
-  }
-  .table thead{ 
-    display: block; 
-    float: left;
-    overflow-x:scroll;
-  }
-  .table tbody{ 
-    display: block; 
-    width: auto; 
-    overflow-x: auto; 
-    white-space: nowrap;
-  }
-  .table th{ 
-    display: block;
-    width:auto;
-  }
-  .table tbody tr{ 
-    display: inline-block; 
-    margin: 0 -3px;
-  }
-  .table td{ 
-    display: block;
-  }
-}
-
 body {
   font-family: "ヒラギノ明朝 Pro W3", "ヒラギノ角ゴ Pro W3", "Hiragino Kaku Gothic Pro", "Liberation Serif", serif;
 }
