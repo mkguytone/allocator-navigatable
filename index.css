@@ -630,19 +630,44 @@ div.navfooter {
 div.navfooter tr td {
   font-size: 120%;
 };
-
-@media only screen and (max-width: 800px) {
-	#unseen table td:nth-child(2), 
-	#unseen table th:nth-child(2) {display: none;}
-}
+section table { width: 100%; }
+section th, section td  { padding: 10px; border: 1px solid #ddd; }
+section th  { background: #f4f4f4; }
  
-@media only screen and (max-width: 640px) {
-	#unseen table td:nth-child(4),
-	#unseen table th:nth-child(4),
-	#unseen table td:nth-child(7),
-	#unseen table th:nth-child(7),
-	#unseen table td:nth-child(8),
-	#unseen table th:nth-child(8){display: none;}
+/*----------------------------------------------------
+  .demo02
+----------------------------------------------------*/
+.table th  { width: 13%; }
+.table td  { text-align: center; }
+.table td:first-child  { text-align: left; }
+@media only screen and (max-width: 1440px) { 
+  .table { 
+    display: block; 
+    width: 100%; 
+    margin: 0 -10px;
+  }
+  .table thead{ 
+    display: block; 
+    float: left;
+    overflow-x:scroll;
+  }
+  .table tbody{ 
+    display: block; 
+    width: auto; 
+    overflow-x: auto; 
+    white-space: nowrap;
+  }
+  .table th{ 
+    display: block;
+    width:auto;
+  }
+  .table tbody tr{ 
+    display: inline-block; 
+    margin: 0 -3px;
+  }
+  .table td{ 
+    display: block;
+  }
 }
 
 body {
