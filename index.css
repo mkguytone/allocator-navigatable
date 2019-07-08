@@ -515,6 +515,11 @@ div.table, div.informaltable {
   background-color: #f1f6fc;
 }*/
 
+table,td,th {
+  border-collapse: collapse;
+  border:1px solid #333;
+}
+
 th {
   font-family: sans-serif;
   color: #000;
@@ -528,6 +533,7 @@ td, th {
   /*font-size: 80%;*/
 }
 
+/*
 div.informaltable table {
   margin: 10px auto !important;
 }
@@ -543,6 +549,7 @@ div.informaltable table tr:nth-of-type(even) {
 div.informaltable td, div.informaltable th {
   border: #9d9d9d 1px solid;
 }
+*/
 
 div.table p.title {
   font-weight: normal;
