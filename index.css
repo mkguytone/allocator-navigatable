@@ -427,6 +427,7 @@ a:hover { color: #6D4100; border-bottom: 1px solid #6D4100; }
 
 div.tableblock > table, table.tableblock { border: 3px solid #E8E8E8; }
 th.tableblock, td.tableblock { border: 1px solid #E8E8E8; }
+
 ul > li > * { color: #3E4349; }
 pre, tt, .monospaced { font-family: Consolas,Menlo,'Deja Vu Sans Mono','Bitstream Vera Sans Mono',monospace; }
 tt, .monospaced { font-size: 0.9em; color: black;
@@ -502,15 +503,16 @@ div.table, table {
   max-width: 95%;
   border-collapse: collapse;
   border-spacing: 0;
+	border-style: solid;
 }
 
 div.table, div.informaltable {
   page-break-inside: avoid;
 }
 
-tr:nth-of-type(even) {
+/*tr:nth-of-type(even) {
   background-color: #f1f6fc;
-}
+}*/
 
 th {
   font-family: sans-serif;
@@ -552,7 +554,6 @@ div.table p.title {
 table code {
   font-size: smaller;
 }
-
 
 div.imageblock div.content { padding-left: 0; }
 span.image img { border-style: none; }
@@ -630,8 +631,11 @@ div.navfooter {
 div.navfooter tr td {
   font-size: 120%;
 };
+
 section table { width: 100%; }
-section th, section td  { padding: 10px; border: 1px solid #ddd; }
+section th, section td  { i
+  padding: 10px; border: 1px solid #ddd; 
+}
 section th  { background: #f4f4f4; }
  
 /*----------------------------------------------------
@@ -640,7 +644,7 @@ section th  { background: #f4f4f4; }
 .table th  { width: 13%; }
 .table td  { text-align: center; }
 .table td:first-child  { text-align: left; }
-@media only screen and (max-width: 1440px) { 
+@media only screen and (max-width: 800px) { 
   .table { 
     display: block; 
     width: 100%; 
