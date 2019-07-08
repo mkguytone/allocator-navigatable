@@ -619,33 +619,18 @@ ul,ol {
   padding: 1em 0.2em 1em 2em;
 }
 
-@media (min-width: 376px) {
 div.navheader tr td {
   font-size: 120%;  
 };
 
-div.navfooter tr td {
+div.navfooter {
   font-size: 120%;
-};
 }
-@media (min-width: 426px) {
-div.navheader tr td {
-  font-size: 120%;  
-};
 
 div.navfooter tr td {
   font-size: 120%;
 };
-}
-@media (min-width: 769px) {
-div.navheader tr td {
-  font-size: 100%;  
-};
 
-div.navfooter tr td {
-  font-size: 100%;
-};
-}
 
 body {
   font-family: "ヒラギノ明朝 Pro W3", "ヒラギノ角ゴ Pro W3", "Hiragino Kaku Gothic Pro", "Liberation Serif", serif;
