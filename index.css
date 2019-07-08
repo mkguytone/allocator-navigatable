@@ -506,6 +506,7 @@ div.table, table {
 }
 
 div.table, div.informaltable {
+	overflow-x:auto;
   page-break-inside: avoid;
 }
 
