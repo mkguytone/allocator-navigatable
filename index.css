@@ -48,20 +48,20 @@ img {
 /* Typography */
 body {
   font-family: 'Open Sans', sans-serif;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5rem;
    }
   @media (min-width: 376px) {
     body {
-      font-size: 14px; } }
+      font-size: 16px; } }
   @media (min-width: 426px) {
     body {
-      font-size: 16px; } }
+      font-size: 18px; } }
   @media (min-width: 769px) {
     body {
-      font-size: 18px; } }
+      font-size: 20px; } }
 
-/* Content Grid */
+/*
 .content-grid {
   margin: 0 auto;
   max-width: calc(100% - 2rem); }
@@ -81,7 +81,6 @@ body {
     .content-grid {
       max-width: calc(100% - 30rem); } }
 
-/* Everything else */
 a {
 	color: blue;
   text-decoration: underline; }
@@ -305,7 +304,7 @@ footer {
     font-size: 0.625em;
     justify-self: flex-end;
     align-self: flex-end; }
-
+*/
 pre.prettyprint {
     display: block;
     overflow: auto;
@@ -425,10 +424,8 @@ a { color: #004B6B; text-decoration: none; border-bottom: 1px dotted #004B6B; }
 a:visited { color: #615FA0; border-bottom: 1px dotted #615FA0; }
 a:hover { color: #6D4100; border-bottom: 1px solid #6D4100; }
 
-/*
 div.tableblock > table, table.tableblock { border: 3px solid #E8E8E8; }
 th.tableblock, td.tableblock { border: 1px solid #E8E8E8; }
-*/
 
 ul > li > * { color: #3E4349; }
 pre, tt, .monospaced { font-family: Consolas,Menlo,'Deja Vu Sans Mono','Bitstream Vera Sans Mono',monospace; }
@@ -533,7 +530,6 @@ td, th {
   /*font-size: 80%;*/
 }
 
-/*
 div.informaltable table {
   margin: 10px auto !important;
 }
@@ -542,14 +538,16 @@ div.informaltable table tr {
   border-bottom: none;
 }
 
+/*
 div.informaltable table tr:nth-of-type(even) {
   background-color: transparent;
 }
+*/
 
 div.informaltable td, div.informaltable th {
-  border: #9d9d9d 1px solid;
+	border-collapse: collapse;
+  border: 1px solid #333;
 }
-*/
 
 div.table p.title {
   font-weight: normal;
@@ -639,6 +637,9 @@ div.navfooter {
 div.navfooter tr td {
   font-size: 120%;
 };
+
+
+
 
 body {
   font-family: "ヒラギノ明朝 Pro W3", "ヒラギノ角ゴ Pro W3", "Hiragino Kaku Gothic Pro", "Liberation Serif", serif;
