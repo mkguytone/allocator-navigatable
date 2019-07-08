@@ -498,6 +498,7 @@ div.tip h3, div.note h3, div.warning h3, div.caution h3, div.important h3 {
 /* tables */
 
 div.table, table {
+	overflow-x:auto;
   margin: 10px auto !important;
   max-width: 95%;
   border-collapse: collapse;
