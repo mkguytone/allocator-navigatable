@@ -631,7 +631,7 @@ div.navfooter tr td {
   font-size: 120%;
 };
 
-@media only screen and (max-width: 800px) {
+@media (max-width: 800px) {
 
 	#flip-scroll .cf:after { visibility: hidden; display: block; font-size: 0; content: " "; clear: both; height: 0; }
 	#flip-scroll * html .cf { zoom: 1; }
