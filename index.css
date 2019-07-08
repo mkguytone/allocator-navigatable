@@ -82,9 +82,6 @@ body {
       max-width: calc(100% - 30rem); } }
 
 /* Everything else */
-body {
-   }
-
 a {
 	color: blue;
   text-decoration: underline; }
@@ -423,9 +420,11 @@ div.title, caption.title { color: #596673; font-weight: bold; }
 div.toclevel1 { margin-top: 0.2em; font-size: 16px; }
 div.toclevel2 { margin-top: 0.15em; font-size: 14px; }
 em, dt, td.hdlist1 { color: black; }
+
 a { color: #004B6B; text-decoration: none; border-bottom: 1px dotted #004B6B; }
 a:visited { color: #615FA0; border-bottom: 1px dotted #615FA0; }
 a:hover { color: #6D4100; border-bottom: 1px solid #6D4100; }
+
 div.tableblock > table, table.tableblock { border: 3px solid #E8E8E8; }
 th.tableblock, td.tableblock { border: 1px solid #E8E8E8; }
 ul > li > * { color: #3E4349; }
@@ -508,16 +507,6 @@ div.table, table {
 div.table, div.informaltable {
   page-break-inside: avoid;
 }
-/*
-tr {
-  border-bottom: 1px solid #c3c3c3;
-}
-
-tr th {
-  border-bottom: #9d9d9d 2px solid !important;
-  border-top: #9d9d9d 2px solid !important;
-}
-*/
 
 tr:nth-of-type(even) {
   background-color: #f1f6fc;
@@ -584,7 +573,7 @@ dd > *:first-child {
 }
 
 ul, ol {
-    list-style-position: outside;
+  list-style-position: outside;
 }
 ol.arabic {
   list-style-type: decimal;
@@ -632,29 +621,29 @@ ul,ol {
 
 @media (min-width: 376px) {
 div.navheader tr td {
-  font-size: 16px;  
+  font-size: 120%;  
 };
 
 div.navfooter tr td {
-  font-size: 16px;
+  font-size: 120%;
 };
 }
 @media (min-width: 426px) {
 div.navheader tr td {
-  font-size: 16px;  
+  font-size: 120%;  
 };
 
 div.navfooter tr td {
-  font-size: 16px;
+  font-size: 120%;
 };
 }
 @media (min-width: 769px) {
 div.navheader tr td {
-  font-size: 18px;  
+  font-size: 100%;  
 };
 
 div.navfooter tr td {
-  font-size: 18px;
+  font-size: 100%;
 };
 }
 
