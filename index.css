@@ -502,7 +502,7 @@ div.table, table {
   margin: 10px auto !important;
   max-width: 95%;
   border-collapse: collapse;
-  border-spacing: 0;
+  border-spacing: 1px;
 }
 
 div.table, div.informaltable {
@@ -515,7 +515,8 @@ div.table, div.informaltable {
 }*/
 
 table,td,th {
-  border-collapse: collapse;
+  border-collapse: separate;
+	border-spacing: 1px;
   border:1px solid #333;
 }
 
