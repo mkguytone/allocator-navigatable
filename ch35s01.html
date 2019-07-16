@@ -75,7 +75,7 @@ Large bin（大きめのチャンクのビン）
 1596 #define MAX_FAST_SIZE     (80 * SIZE_SZ / 4)
 1597
 1598 #define NFASTBINS  (fastbin_index (request2size (MAX_FAST_SIZE)) + 1)</pre><p>
-</p><p>　この中で注目すべきは MAX_FAST_SIZE と fastbin_index(sz) となります。</p><p>　まずは MAX_FAST_SIZE ですが、これは最大値のことです。</p><p>　SIZE_SZ は size_t 型のバイトサイズと同じと考えると 64 ビットアーキテクチャだと 8 バイトなので 160 バイトが最大サイズですね。</p><p>　32 ビットアーキテクチャだと SIZE_SZ は 4 バイトと推理できるので 80 バイトになります。</p><div class="table"><a id="idm1539"></a><p class="title"><strong>表35.1 fastbin_index(sz) の結果</strong></p><div class="table-contents"><table class="table" summary="fastbin_index(sz) の結果" cellpadding="4px" style="border-collapse: collapse;border-top: 3px solid #527bbd; border-bottom: 3px solid #527bbd; border-left: 3px solid #527bbd; border-right: 3px solid #527bbd; "><colgroup><col class="col_1" /><col class="col_2" /><col class="col_3" /><col class="col_4" /><col class="col_5" /><col class="col_6" /><col class="col_7" /><col class="col_8" /><col class="col_9" /><col class="col_10" /><col class="col_11" /><col class="col_12" /><col class="col_13" /><col class="col_14" /><col class="col_15" /><col class="col_16" /><col class="col_17" /><col class="col_18" /></colgroup><tbody><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">sz の値             </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">8 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">16</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">24</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">32</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">40</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">48</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">56</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">64</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">72</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">80</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">88</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">96</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">112</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">128</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">144</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">160</pre></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">176</pre></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">32 ビットのインデックス</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">-1</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">0 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">1 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">2 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">3 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">4 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">5 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">6 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">7 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">8 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">9 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">   </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">   </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">   </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">   </pre></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout"></pre></td></tr><tr><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">64 ビットのインデックス</pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">-1</pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">0 </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">1 </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">2 </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">3 </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">4 </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">5  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">6  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">7  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">8  </pre></td><td style="" align="left" valign="top"><pre class="literallayout">9</pre></td></tr></tbody></table></div></div><br class="table-break" /><p>　このように 32 ビットアーキテクチャでは 16 バイトから 88 バイトを 8 バイト間隔にしたビンが存在します。</p><p>　64 ビットアーキテクチャでは 32 バイトから 176 バイトを 16 バイト間隔にしたビンが存在します。</p><p>　最後にNFASTBINS はファーストビンの中の要素数ですが request2size(req) マクロを使っています。</p><p>　request2size(req) の定義は以下のようになります。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
+</p><p>　この中で注目すべきは MAX_FAST_SIZE と fastbin_index(sz) となります。</p><p>　まずは MAX_FAST_SIZE ですが、これは最大値のことです。</p><p>　SIZE_SZ は size_t 型のバイトサイズと同じと考えると 64 ビットアーキテクチャだと 8 バイトなので 160 バイトが最大サイズですね。</p><p>　32 ビットアーキテクチャだと SIZE_SZ は 4 バイトと推理できるので 80 バイトになります。</p><div class="table"><a id="idm1546"></a><p class="title"><strong>表35.1 fastbin_index(sz) の結果</strong></p><div class="table-contents"><table class="table" summary="fastbin_index(sz) の結果" cellpadding="4px" style="border-collapse: collapse;border-top: 3px solid #527bbd; border-bottom: 3px solid #527bbd; border-left: 3px solid #527bbd; border-right: 3px solid #527bbd; "><colgroup><col class="col_1" /><col class="col_2" /><col class="col_3" /><col class="col_4" /><col class="col_5" /><col class="col_6" /><col class="col_7" /><col class="col_8" /><col class="col_9" /><col class="col_10" /><col class="col_11" /><col class="col_12" /><col class="col_13" /><col class="col_14" /><col class="col_15" /><col class="col_16" /><col class="col_17" /><col class="col_18" /></colgroup><tbody><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">sz の値             </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">8 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">16</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">24</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">32</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">40</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">48</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">56</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">64</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">72</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">80</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">88</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">96</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">112</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">128</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">144</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">160</pre></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">176</pre></td></tr><tr><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">32 ビットのインデックス</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">-1</pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">0 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">1 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">2 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">3 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">4 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">5 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">6 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">7 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">8 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">9 </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">   </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">   </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">   </pre></td><td style="border-right: 1px solid #527bbd; border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">   </pre></td><td style="border-bottom: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout"></pre></td></tr><tr><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">64 ビットのインデックス</pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">-1</pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">0 </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">1 </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">2 </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">3 </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">4 </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">5  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">6  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">7  </pre></td><td style="border-right: 1px solid #527bbd; " align="left" valign="top"><pre class="literallayout">8  </pre></td><td style="" align="left" valign="top"><pre class="literallayout">9</pre></td></tr></tbody></table></div></div><br class="table-break" /><p>　このように 32 ビットアーキテクチャでは 16 バイトから 88 バイトを 8 バイト間隔にしたビンが存在します。</p><p>　64 ビットアーキテクチャでは 32 バイトから 176 バイトを 16 バイト間隔にしたビンが存在します。</p><p>　最後にNFASTBINS はファーストビンの中の要素数ですが request2size(req) マクロを使っています。</p><p>　request2size(req) の定義は以下のようになります。</p><p><strong>malloc.c（https://github.com/MacKomatsu/glibc/blob/release/2.27/master/malloc/malloc.c）. </strong>
 </p><pre xmlns="" class="prettyprint">  1217 /* pad request bytes into a usable size -- internal version */
   1218
   1219 #define request2size(req)                                         \
@@ -145,4 +145,505 @@ Large bin（大きめのチャンクのビン）
 </p><pre xmlns="" class="prettyprint">$ gcc main.c
 $ ./a.out
 10</pre><p>
-</p><p>　これによると NFASTBINS は 10 として評価されます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch35.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch35.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch36.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><p xmlns="">Copyright 2018-2019, by Masaki Komatsu</p></body></html>
+</p><p>　これによると NFASTBINS は 10 として評価されます。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch35.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="ch35.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch36.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><html>
+<head>
+<meta name="generator" content="HTML Tidy for HTML5 for Linux version 5.2.0" />
+<title></title>
+</head>
+<body>
+<p>Copyright 2018-2019, by Masaki Komatsu</p>
+<div class="toc">
+<p><strong>目次</strong></p>
+<dl class="toc">
+<dt><span class="preface"><a href="pr01.html">序文</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="pr01s01.html">1. Linux
+カーネルを学ぶ意義</a></span></dt>
+<dt><span class="section"><a href="pr01s02.html">2. C++
+カスタムアロケーターを作る意義</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch01.html">1.
+対象となる読者</a></span></dt>
+<dt><span class="chapter"><a href="ch02.html">2.
+前提知識</a></span></dt>
+<dt><span class="chapter"><a href="ch03.html">3.
+開発環境</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch03s01.html">3.1. Linux
+カーネルのバージョンを揃える</a></span></dt>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt01.html">I. Linux と POSIX
+C</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch04.html">4.
+パイプとリダイレクトのまとめ</a></span></dt>
+<dt><span class="chapter"><a href="ch05.html">5. echo
+コマンド</a></span></dt>
+<dt><span class="chapter"><a href="ch06.html">6.
+シェルの確認</a></span></dt>
+<dt><span class="chapter"><a href="ch07.html">7. /dev
+ディレクトリー</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch07s01.html">7.1. echo
+のリダイレクト</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch08.html">8.
+アペンド</a></span></dt>
+<dt><span class="chapter"><a href="ch09.html">9.
+リダイレクトのファイル記述子</a></span></dt>
+<dt><span class="chapter"><a href="ch10.html">10.
+ファイル記述子間のリダイレクト</a></span></dt>
+<dt><span class="chapter"><a href="ch11.html">11.
+ファイル記述子リダイレクトのまとめ</a></span></dt>
+<dt><span class="chapter"><a href="ch12.html">12. exec
+(bash)</a></span></dt>
+<dt><span class="chapter"><a href="ch13.html">13.
+ファイル記述子を閉じる</a></span></dt>
+<dt><span class="chapter"><a href="ch14.html">14.
+読み書きファイル記述子</a></span></dt>
+<dt><span class="chapter"><a href="ch15.html">15. /proc
+ディレクトリー</a></span></dt>
+<dt><span class="chapter"><a href="ch16.html">16. /dev/shm
+ディレクトリー</a></span></dt>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt02.html">II. Linux (POSIX)
+のファイル入出力</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch17.html">17. system
+関数</a></span></dt>
+<dt><span class="chapter"><a href="ch18.html">18. fprintf
+関数</a></span></dt>
+<dt><span class="chapter"><a href="ch19.html">19. open / dprintf
+関数</a></span></dt>
+<dt><span class="chapter"><a href="ch20.html">20. read() / write()
+関数</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch20s01.html">20.1.
+文字列をヒープにコピー</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch21.html">21.
+lseek()</a></span></dt>
+<dt><span class="chapter"><a href="ch22.html">22. fopen / fread /
+fwrite / fclose 関数</a></span></dt>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt03.html">III. Linux
+でメモリー割り当て</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch23.html">23. 32
+ビットプロセスのレイアウト</a></span></dt>
+<dt><span class="chapter"><a href="ch24.html">24. malloc
+(cstdlib)</a></span></dt>
+<dt><span class="chapter"><a href="ch25.html">25. malloc を strace
+で検証してみる</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch25s01.html">25.1. ASLR
+と共有オブジェクト</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch26.html">26. MALLOC(3) Linux
+プログラマーマニュアル</a></span></dt>
+<dt><span class="chapter"><a href="ch27.html">27. brk / sbrk
+(unistd.h)</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch27s01.html">27.1. gdb で sbrk()
+の解析</a></span></dt>
+<dt><span class="section"><a href="ch27s02.html">27.2. strace によって
+brk() / malloc() のコールをチェック</a></span></dt>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt04.html">IV. glibc から malloc()
+の基本構造を理解してみる</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch28.html">28. malloc()
+の内部実装</a></span></dt>
+<dt><span class="chapter"><a href="ch29.html">29.
+アリーナによるマルチスレッド対応</a></span></dt>
+<dt><span class="chapter"><a href="ch30.html">30. アリーナオブジェクト（
+main_arena / malloc_state ）</a></span></dt>
+<dt><span class="chapter"><a href="ch31.html">31. ヒープのヘッダーオブジェクト（
+heap_info )</a></span></dt>
+<dt><span class="chapter"><a href="ch32.html">32. チャンク（
+malloc_chunk ）</a></span></dt>
+<dt><span class="chapter"><a href="ch33.html">33.
+最少チャンクサイズと最少割り当てサイズ</a></span></dt>
+<dt><span class="chapter"><a href="ch34.html">34.
+malloc_par</a></span></dt>
+<dt><span class="chapter"><a href="ch35.html">35. top
+チャンク</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch35s01.html">35.1.
+ビン</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch36.html">36. 未整理ビン / スモールビン /
+ラージビン</a></span></dt>
+<dt><span class="chapter"><a href="ch37.html">37.
+ビンのインデックスの計算</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch37s01.html">37.1. 32
+ビットアーキテクチャのビン</a></span></dt>
+<dt><span class="section"><a href="ch37s02.html">37.2. 64
+ビットアーキテクチャのビン</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch38.html">38.
+ビン・インデックスのまとめ</a></span></dt>
+<dt><span class="chapter"><a href="ch39.html">39.
+ビンのチャンク連結</a></span></dt>
+<dt><span class="chapter"><a href="ch40.html">40.
+ビンの初期化</a></span></dt>
+<dt><span class="chapter"><a href="ch41.html">41. 未整理チャンク（ Unsorted
+Chunk ）のマクロ</a></span></dt>
+<dt><span class="chapter"><a href="ch42.html">42. トップチャンク（ Top
+Chunk ）のマクロ</a></span></dt>
+<dt><span class="chapter"><a href="ch43.html">43. Binmap
+のマクロ</a></span></dt>
+<dt><span class="chapter"><a href="ch44.html">44.
+tcache</a></span></dt>
+<dt><span class="chapter"><a href="ch45.html">45. malloc()
+フリーチャンクの挙動</a></span></dt>
+<dt><span class="chapter"><a href="ch46.html">46. malloc.c
+の内部マクロ</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch46s01.html">46.1.
+チャンクを取り扱えるマクロ</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch47.html">47.
+ファーストビンの解放</a></span></dt>
+<dt><span class="chapter"><a href="ch48.html">48. malloc.c
+の内部関数</a></span></dt>
+<dt><span class="chapter"><a href="ch49.html">49. malloc()
+の実装</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch49s01.html">49.1.
+_int_malloc() 関数</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch50.html">50. free()
+の実装</a></span></dt>
+<dt><span class="chapter"><a href="ch51.html">51.
+calloc()</a></span></dt>
+<dt><span class="chapter"><a href="ch52.html">52.
+realloc()</a></span></dt>
+<dt><span class="chapter"><a href="ch53.html">53. alloca()
+関数</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch53s01.html">53.1. alloca()
+の使用法</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch54.html">54. posix_memalign()
+/ aligned_alloc()</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch54s01.html">54.1. glibc-2.7
+の内部実装</a></span></dt>
+<dt><span class="section"><a href="ch54s02.html">54.2.
+アラインメントの仕組み</a></span></dt>
+<dt><span class="section"><a href="ch54s03.html">54.3.
+アラインメントの最少サイズ</a></span></dt>
+<dt><span class="section"><a href="ch54s04.html">54.4.
+大きめのアラインメント</a></span></dt>
+<dt><span class="section"><a href="ch54s05.html">54.5.
+複数のアラインメントでの検証</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch55.html">55. std::launder (
+C++17 )</a></span></dt>
+<dt><span class="chapter"><a href="ch56.html">56.
+std::aligned_storage ( C++11 )</a></span></dt>
+<dt><span class="chapter"><a href="ch57.html">57. std::align (
+C++11 )</a></span></dt>
+<dt><span class="chapter"><a href="ch58.html">58.
+std::aligned_alloc ( C++17 )</a></span></dt>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt05.html">V. Linux
+カーネルのメモリーとファイルシステム</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch59.html">59. Linux
+の仮想メモリーエリア・メモリー記述子</a></span></dt>
+<dt><span class="chapter"><a href="ch60.html">60. メモリー記述子（
+mm_struct ）</a></span></dt>
+<dt><span class="chapter"><a href="ch61.html">61. 仮想メモリー領域（
+vm_area_struct ）</a></span></dt>
+<dt><span class="chapter"><a href="ch62.html">62. ページ記述子（ struct
+page ）</a></span></dt>
+<dt><span class="chapter"><a href="ch63.html">63.
+ページとブロック</a></span></dt>
+<dt><span class="chapter"><a href="ch64.html">64. バッファー (
+buffer_head )</a></span></dt>
+<dt><span class="chapter"><a href="ch65.html">65. ブロック I/O ( bio
+)</a></span></dt>
+<dt><span class="chapter"><a href="ch66.html">66.
+ページのキャッシュ</a></span></dt>
+<dt><span class="chapter"><a href="ch67.html">67.
+スラブレイヤー・スラブアロケーター</a></span></dt>
+<dt><span class="chapter"><a href="ch68.html">68. ファイルとメモリーのマッピング
+(mmap)</a></span></dt>
+<dt><span class="chapter"><a href="ch69.html">69.
+ページとハードウェア</a></span></dt>
+<dt><span class="chapter"><a href="ch70.html">70. ページキャッシュ ( struct
+address_space )</a></span></dt>
+<dt><span class="chapter"><a href="ch71.html">71. Linux
+のファイルシステム</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch71s01.html">71.1. カーネルヘッダー (
+/usr/src/ )</a></span></dt>
+<dt><span class="section"><a href="ch71s02.html">71.2.
+カーネルソースのアーカイブ</a></span></dt>
+<dt><span class="section"><a href="ch71s03.html">71.3. super_block
+(カーネル)</a></span></dt>
+<dt><span class="section"><a href="ch71s04.html">71.4. inode
+(カーネル)</a></span></dt>
+<dt><span class="section"><a href="ch71s05.html">71.5. dentry
+(カーネル)</a></span></dt>
+<dt><span class="section"><a href="ch71s06.html">71.6. file
+(カーネル)</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch72.html">72. stat
+構造体</a></span></dt>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt06.html">VI. mmap</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch73.html">73. mmap
+の使い方</a></span></dt>
+<dt><span class="chapter"><a href="ch74.html">74.
+マルチタスクで使えると共有メモリーオブジェクト</a></span></dt>
+<dt><span class="chapter"><a href="ch75.html">75.
+fork()</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch75s01.html">75.1. fork() を 2
+回コールする</a></span></dt>
+<dt><span class="section"><a href="ch75s02.html">75.2. fork() を 3
+回コールする</a></span></dt>
+<dt><span class="section"><a href="ch75s03.html">75.3. fork() を 4
+回コールする</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch76.html">76. fstat
+関数を使ってファイルサイズを指定する場合</a></span></dt>
+<dt><span class="chapter"><a href="ch77.html">77. MAP_PRIVATE の
+Copy-On-Write</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch77s01.html">77.1. fork() で
+MAP_PRIVATE の Copy-On-Write を検証</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch78.html">78.
+MAP_ANONYMOUS</a></span></dt>
+<dt><span class="chapter"><a href="ch79.html">79.
+アノニマスマッピング</a></span></dt>
+<dt><span class="chapter"><a href="ch80.html">80. fork()
+でプライベートファイルマッピングのチェック</a></span></dt>
+<dt><span class="chapter"><a href="ch81.html">81. fork()
+でプライベートアノニマスマッピングをチェック</a></span></dt>
+<dt><span class="chapter"><a href="ch82.html">82. fork()
+で共有ファイルマッピングをチェック</a></span></dt>
+<dt><span class="chapter"><a href="ch83.html">83. fork()
+で共有アノニマスマッピングをチェック</a></span></dt>
+<dt><span class="chapter"><a href="ch84.html">84.
+/dev/zero</a></span></dt>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt07.html">VII.
+（汎用ではない）カスタムアロケーターの設計</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch85.html">85.
+アロケーターに必要な最低限の関数・オーバーロード・テンプレート</a></span></dt>
+<dt><span class="chapter"><a href="ch86.html">86. std::allocator
+を使うだけのリファレンスアロケーター</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch86s01.html">86.1.
+std::allocator を模したカスタムアロケーター</a></span></dt>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt08.html">VIII.
+スマートポインターで使えるデリーター</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch87.html">87.
+スマートポインターの実装</a></span></dt>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt09.html">IX.
+スタック領域に割り当てるアロケーター</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch88.html">88.
+配列内のアドレスの走査</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch88s01.html">88.1.
+スタックアロケーター（可変長のリクエストサイズに対応、難易度高いのでスキップ推奨）</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch89.html">89.
+ヒープへのフォールバック付きスタックアロケーター</a></span></dt>
+<dt><span class="chapter"><a href="ch90.html">90.
+コードをシンプルにする（内部バッファーのアドレスかのチェック）</a></span></dt>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt10.html">X.
+ヒープ領域のアドレスに割り当て</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch91.html">91.
+ヒープ領域のアドレス</a></span></dt>
+<dt><span class="chapter"><a href="ch92.html">92. malloc
+を使ってヒープに割り当て</a></span></dt>
+<dt><span class="chapter"><a href="ch93.html">93.
+カスタムヒープアロケーター</a></span></dt>
+<dt><span class="chapter"><a href="ch94.html">94. static
+オブジェクトはヒープっぽい領域に割り当てられるはず？</a></span></dt>
+<dt><span class="chapter"><a href="ch95.html">95.
+アロケーターをスタティックメンバーにするとどうなるのか？</a></span></dt>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt11.html">XI.
+アロケーターをセレクターで切り替え</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch96.html">96.
+アロケータークラス内での複数の割り当て方針を切り替え</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch96s01.html">96.1.
+複数のアロケーターインスタンスを切り替え</a></span></dt>
+</dl>
+</dd>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt12.html">XII. C++ カスタムアロケーターの STL
+サポート（実験）</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch97.html">97. C++
+カスタムスタックアロケーターの用語の復習</a></span></dt>
+<dt><span class="chapter"><a href="ch98.html">98. STL コンテナのサポート (
+new / delete )</a></span></dt>
+<dt><span class="chapter"><a href="ch99.html">99. STL
+サポートの適用対象</a></span></dt>
+<dt><span class="chapter"><a href="ch100.html">100. STL
+コンテナ側のメモリー割り当て要件</a></span></dt>
+<dt><span class="chapter"><a href="ch101.html">101. sizeof
+を使った割り当てサイズの算出によるスタックアロケーター実装</a></span></dt>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt13.html">XIII. mmap()
+を使ったカスタムアロケーター</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch102.html">102.
+ユーザーによるオブジェクト管理を前提にするカスタムページアロケーター</a></span></dt>
+<dt><span class="chapter"><a href="ch103.html">103.
+カスタムアロケーターによるブロック管理</a></span></dt>
+</dl>
+</dd>
+<dt><span class="part"><a href="pt14.html">XIV.
+（おまけ）アロケーターのポリモーフィズム</a></span></dt>
+<dd>
+<dl>
+<dt><span class="chapter"><a href="ch104.html">104.
+メモリーリソースクラス</a></span></dt>
+<dt><span class="chapter"><a href="ch105.html">105.
+std::experimental::pmr::memory_resource ( C++17 )</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch105s01.html">105.1.
+memory_resource でアラインメントの実装（非実用的な実験です）</a></span></dt>
+</dl>
+</dd>
+<dt><span class="chapter"><a href="ch106.html">106.
+ポリモーフィックアロケーター</a></span></dt>
+<dt><span class="chapter"><a href="ch107.html">107.
+std::pmr::polymorphic_allocator ( C++17 )</a></span></dt>
+<dt><span class="chapter"><a href="ch108.html">108.
+std::experimental::pmr::vector コンテナ ( C++17 )</a></span></dt>
+<dt><span class="chapter"><a href="ch109.html">109.
+std::pmr::polymorphic_allocator の動作チェック</a></span></dt>
+<dd>
+<dl>
+<dt><span class="section"><a href="ch109s01.html">109.1.
+ポリモーフィックアロケーターの実装</a></span></dt>
+</dl>
+</dd>
+</dl>
+</dd>
+</dl>
+</div>
+<div class="list-of-figures">
+<p><strong>図の一覧</strong></p>
+<dl>
+<dt>30.1. <a href="ch30.html#idm1253">メインアリーナ（main_arena）</a></dt>
+<dt>30.2. <a href="ch30.html#idm1266">スレッドアリーナ</a></dt>
+<dt>32.1. <a href="ch32.html#idm1345">割り当て済みチャンク（allocated
+chunk）</a></dt>
+<dt>32.2. <a href="ch32.html#idm1372">割り当て済みチャンクの内部（allocated
+chunk）</a></dt>
+<dt>32.3. <a href="ch32.html#idm1382">フリーチャンク（free chunk）</a></dt>
+<dt>32.4. <a href="ch32.html#idm1392">フリーチャンクの内部（small free
+chunk、大きめでない場合）</a></dt>
+<dt>39.1. <a href="ch39.html#idm2278">Unsorted/Small/Large
+Bins</a></dt>
+<dt>39.2. <a href="ch39.html#idm2306">Large Bins</a></dt>
+<dt>68.1. <a href="ch68.html#idm3396">一段ページテーブル構成</a></dt>
+<dt>68.2. <a href="ch68.html#idm3403">二段ページテーブル構成</a></dt>
+<dt>68.3. <a href="ch68.html#idm3412">Linux 三段ページテーブル（Linux
+2.6.11以前）</a></dt>
+</dl>
+</div>
+<div class="list-of-tables">
+<p><strong>表の一覧</strong></p>
+<dl>
+<dt>19.1. <a href="ch19.html#idm558">mode</a></dt>
+<dt>35.1. <a href="ch35s01.html#idm1539">fastbin_index(sz)
+の結果</a></dt>
+<dt>37.1. <a href="ch37s01.html#idm1783">64 バイト間隔のインデックス</a></dt>
+<dt>37.2. <a href="ch37s01.html#idm1838">512 バイト間隔のインデックス</a></dt>
+<dt>37.3. <a href="ch37s01.html#idm1927">4096 バイト間隔のインデックス</a></dt>
+<dt>37.4. <a href="ch37s01.html#idm1981">32768
+バイト間隔のインデックス</a></dt>
+<dt>37.5. <a href="ch37s01.html#idm2016">262144
+バイト間隔のインデックス</a></dt>
+<dt>73.1. <a href="ch73.html#idm3751">メモリー保護（ prot ）</a></dt>
+</dl>
+</div>
+<p>Copyright 2018-2019, by Masaki Komatsu</p>
+</body>
+</html></body></html>
