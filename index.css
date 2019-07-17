@@ -57,10 +57,10 @@ body {
       font-size: 14px; } }
   @media (min-width: 426px) {
     body {
-      font-size: 15px; } }
+      font-size: 16px; } }
   @media (min-width: 769px) {
     body {
-      font-size: 16px; } }
+      font-size: 18px; } }
 
 pre.prettyprint {
     display: block;
