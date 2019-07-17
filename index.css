@@ -267,10 +267,6 @@ div.table, div.informaltable {
   page-break-inside: avoid;
 }
 
-/*tr:nth-of-type(even) {
-  background-color: #f1f6fc;
-}*/
-
 table,td,th {
   border-collapse: collapse;
 	border-spacing: 0;
