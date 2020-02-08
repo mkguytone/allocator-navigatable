@@ -3,7 +3,7 @@
     window.addEventListener("load", function() {
       PR.prettyPrint();
 	  });	
-	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch03s02.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch04.html">次へ</a></td></tr></table><hr /></div><div class="part"><div class="titlepage"><div><div><h1 class="title"><a id="_linux_と_posix_c"></a>パート I. Linux と POSIX C</h1></div></div></div><div class="toc"><p><strong>目次</strong></p><dl class="toc"><dt><span class="chapter"><a href="ch04.html">4. パイプとリダイレクトのまとめ</a></span></dt><dt><span class="chapter"><a href="ch05.html">5. echo コマンド</a></span></dt><dt><span class="chapter"><a href="ch06.html">6. シェルの確認</a></span></dt><dt><span class="chapter"><a href="ch07.html">7. /dev ディレクトリー</a></span></dt><dd><dl><dt><span class="section"><a href="ch07s01.html">7.1. echo のリダイレクト</a></span></dt></dl></dd><dt><span class="chapter"><a href="ch08.html">8. アペンド</a></span></dt><dt><span class="chapter"><a href="ch09.html">9. リダイレクトのファイル記述子</a></span></dt><dt><span class="chapter"><a href="ch10.html">10. ファイル記述子間のリダイレクト</a></span></dt><dt><span class="chapter"><a href="ch11.html">11. ファイル記述子リダイレクトのまとめ</a></span></dt><dt><span class="chapter"><a href="ch12.html">12. exec (bash)</a></span></dt><dt><span class="chapter"><a href="ch13.html">13. ファイル記述子を閉じる</a></span></dt><dt><span class="chapter"><a href="ch14.html">14. 読み書きファイル記述子</a></span></dt><dt><span class="chapter"><a href="ch15.html">15. /proc ディレクトリー</a></span></dt><dt><span class="chapter"><a href="ch16.html">16. /dev/shm ディレクトリー</a></span></dt></dl></div><p>　本書の主題であるメモリーの割り当ての説明をする前に Linux と C 言語のつながりを整理しときましょう。</p><p>　まずは知っておきたい C 言語の標準(POSIX)ライブラリーのヘッダーファイルをまとめておきましょう。</p><p>　まずは誰でも知っておくべきヘッダーファイルです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch03s02.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch04.html">次へ</a></td></tr></table><hr /></div><div class="part"><div class="titlepage"><div><div><h1 class="title"><a id="_linux_と_posix_c"></a>パート I. Linux と POSIX C</h1></div></div></div><div class="toc"><p><strong>目次</strong></p><dl class="toc"><dt><span class="chapter"><a href="ch04.html">4. パイプとリダイレクトのまとめ</a></span></dt><dt><span class="chapter"><a href="ch05.html">5. echo コマンド</a></span></dt><dt><span class="chapter"><a href="ch06.html">6. シェルの確認</a></span></dt><dt><span class="chapter"><a href="ch07.html">7. /dev ディレクトリー</a></span></dt><dd><dl><dt><span class="section"><a href="ch07s01.html">7.1. echo のリダイレクト</a></span></dt></dl></dd><dt><span class="chapter"><a href="ch08.html">8. アペンド</a></span></dt><dt><span class="chapter"><a href="ch09.html">9. リダイレクトのファイル記述子</a></span></dt><dt><span class="chapter"><a href="ch10.html">10. ファイル記述子間のリダイレクト</a></span></dt><dt><span class="chapter"><a href="ch11.html">11. ファイル記述子リダイレクトのまとめ</a></span></dt><dt><span class="chapter"><a href="ch12.html">12. exec (bash)</a></span></dt><dt><span class="chapter"><a href="ch13.html">13. ファイル記述子を閉じる</a></span></dt><dt><span class="chapter"><a href="ch14.html">14. 読み書きファイル記述子</a></span></dt><dt><span class="chapter"><a href="ch15.html">15. /proc ディレクトリー</a></span></dt><dt><span class="chapter"><a href="ch16.html">16. /dev/shm ディレクトリー</a></span></dt></dl></div><p>本書の主題であるメモリーの割り当ての説明をする前に Linux と C 言語のつながりを整理しときましょう。</p><p>まずは知っておきたい C 言語の標準(POSIX)ライブラリーのヘッダーファイルをまとめておきましょう。</p><p>まずは誰でも知っておくべきヘッダーファイルです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
 stdio.h
 </span></dt><dd>
 printf / fopen /puts 等の IO 処理
@@ -15,7 +15,7 @@ stdlib.h
 string.h
 </span></dt><dd>
 メモリーのコピー・設定などの操作や文字列の処理
-</dd></dl></div><p>　もう一つは OS の機能とインターフェースしたり、ローレベルでのコーディングに使えるヘッダーファイルです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+</dd></dl></div><p>もう一つは OS の機能とインターフェースしたり、ローレベルでのコーディングに使えるヘッダーファイルです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
 fcntl.h
 </span></dt><dd>
 fcntl関数によってファイルの制御をするためのマクロとその他関数（open / openat / creat 等）
@@ -31,7 +31,7 @@ setjmp.h
 signal.h
 </span></dt><dd>
 システムシグナルのAPI
-</dd></dl></div><p>　さらに処理のために必要な型・（C プリプロセッサー）マクロは以下のヘッダーに定義されます。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+</dd></dl></div><p>さらに処理のために必要な型・（C プリプロセッサー）マクロは以下のヘッダーに定義されます。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
 sys/types.h
 </span></dt><dd>
 mode_t / uid_t / gid_t / pid_t / dev_t / clock_t / pthread_t / size_t / time_t 等の型を定義
@@ -42,8 +42,8 @@ stat / fstat / lstat 関数から戻る stat 型・マクロの定義
 </dd><dt><span class="term">
 sys/mman.h
 </span></dt><dd>
-　sys/stat.h の構造体には sys/types.h のデータ型も含みまする！！
-</dd></dl></div><p>　こんなもんですかね！！！</p><p>　賢明または懸命な読者には楽勝でござるね！！！</p><p>　(´・ω・｀)</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch03s02.html">戻る</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="ch04.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><wrapper xmlns=""><p>Copyright 2018-2019, by Masaki Komatsu</p>
+sys/stat.h の構造体には sys/types.h のデータ型も含みまする！！
+</dd></dl></div><p>こんなもんですかね！！！</p><p>賢明または懸命な読者には楽勝でござるね！！！</p><p>(´・ω・｀)</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch03s02.html">戻る</a> </td><td width="20%" align="center"> </td><td width="40%" align="right"> <a accesskey="n" href="ch04.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><wrapper xmlns=""><p>Copyright 2018-2019, by Masaki Komatsu</p>
 
 
 </wrapper></body></html>

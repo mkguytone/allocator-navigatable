@@ -173,7 +173,7 @@ std::map&lt;const,int&gt; values: 2 3 6</pre><p>
 sizeof(T) @ allocate(): 4
 sizeof(T) @ allocate(): 4
 sizeof(T) @ allocate(): 4
-std::vector&lt;int&gt; values: 5 10 20</pre><p>パット見では限り誤ったところは無いですね。</p><p>ちなみにデフォルトコンストラクターで出力させた sizeof(T) の結果は 4 でした。</p><p>次は std::list です。</p><pre xmlns="" class="prettyprint"> 91   std::list&lt;int,alloc&gt; lst;
+std::vector&lt;int&gt; values: 5 10 20</pre><p>パット見た限りでは誤ったところは無いですね。</p><p>ちなみにデフォルトコンストラクターで出力させた sizeof(T) の結果は 4 でした。</p><p>次は std::list です。</p><pre xmlns="" class="prettyprint"> 91   std::list&lt;int,alloc&gt; lst;
  92
  93   lst.push_back(5);
  94   lst.push_back(10);

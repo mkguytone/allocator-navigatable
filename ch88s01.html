@@ -3,26 +3,26 @@
     window.addEventListener("load", function() {
       PR.prettyPrint();
 	  });	
-	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch88.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch89.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_スタックアロケーター_可変長のリクエストサイズに対応_難易度高いのでスキップ推奨"></a>88.1. スタックアロケーター（可変長のリクエストサイズに対応、難易度高いのでスキップ推奨）</h2></div></div></div><p>　この項目では固定長のスタックアロケーターを紹介します。</p><p>　スタックアロケーターは割り当てたいメモリーのサイズが可変長の場合だと、いくつか念頭にしておくべき点が出てきます。</p><p>　実装の観点から感がえると、割り当てるサイズが固定長のサイズであり、解放は最後に割り当てたメモリー領域からする前提が一番シンプルです。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch88.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch89.html">次へ</a></td></tr></table><hr /></div><div class="section"><div class="titlepage"><div><div><h2 class="title" style="clear: both"><a id="_スタックアロケーター_可変長のリクエストサイズに対応_難易度高いのでスキップ推奨"></a>88.1. スタックアロケーター（可変長のリクエストサイズに対応、難易度高いのでスキップ推奨）</h2></div></div></div><p>この項目では固定長のスタックアロケーターを紹介します。</p><p>スタックアロケーターは割り当てたいメモリーのサイズが可変長の場合だと、いくつか念頭にしておくべき点が出てきます。</p><p>実装の観点から感がえると、割り当てるサイズが固定長のサイズであり、解放は最後に割り当てたメモリー領域からする前提が一番シンプルです。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 リクエストサイズは一定とする
 </li><li class="listitem">
 最後に割り当てたチャンクから解放していく
-</li></ul></div><p>　この条件が満たされるなら、以下のような関数の実装で割り当て、解放ができます。</p><pre xmlns="" class="prettyprint">allocate（リクエスト個数）{
+</li></ul></div><p>この条件が満たされるなら、以下のような関数の実装で割り当て、解放ができます。</p><pre xmlns="" class="prettyprint">allocate（リクエスト個数）{
   スタックポインター += (リクエスト個数 * ブロックサイズ);
   return スタックポインター;
 }
 
 deallocate (リクエスト個数) {
   スタックポインター -= (リクエスト個数 * ブロックサイズ);
-}</pre><p>　スタックポインターは割り当てるポインターとなり、リクエスト個数はアロケーター要件に準拠した allocate() や deallocate() の引数の一つです。</p><p>　ブロックサイズは 1 回のメモリー割り当てに使える最低サイズ、つまり割り当ての最少単位です。</p><p>　リクエスト個数とかブロックサイズが理解しにくければ「（割り当ての）リクエストサイズ ＝ リクエスト個数 * ブロックサイズ」と考えると分かりやすいかもしれないですね。</p><p>　 allocate() と deallocate() は割り当てをすればスタックポインターの位置は上がり、解放すれば位置は下がるという具合になります。</p><p>　ですがこのようなアロケーター実装は現実には全く使えません。</p><p>　なぜならアロケーターは以下の 2 点を満たさないのなら、スタックのエミュレーターと何ら変わりがないからです。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+}</pre><p>スタックポインターは割り当てるポインターとなり、リクエスト個数はアロケーター要件に準拠した allocate() や deallocate() の引数の一つです。</p><p>ブロックサイズは 1 回のメモリー割り当てに使える最低サイズ、つまり割り当ての最少単位です。</p><p>リクエスト個数とかブロックサイズが理解しにくければ「（割り当ての）リクエストサイズ ＝ リクエスト個数 * ブロックサイズ」と考えると分かりやすいかもしれないですね。</p><p>allocate() と deallocate() は割り当てをすればスタックポインターの位置は上がり、解放すれば位置は下がるという具合になります。</p><p>ですがこのようなアロケーター実装は現実には全く使えません。</p><p>なぜならアロケーターは以下の 2 点を満たさないのなら、スタックのエミュレーターと何ら変わりがないからです。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 リクエストサイズ（＝リクエスト個数 * ブロックサイズ）は可変
 </li><li class="listitem">
 どのチャンクを解放するかは自由
-</li></ul></div><p>　この条件を満たすには、以下の 2 つを作り込む必要があります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
+</li></ul></div><p>この条件を満たすには、以下の 2 つを作り込む必要があります。</p><div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; "><li class="listitem">
 リクエストサイズに応じたフリーリスト（キャッシュプール）
 </li><li class="listitem">
 割り当てたポインターのサイズから、キャッシュプールの割り出し
-</li></ul></div><p>　どちらも難しいですが実装してみましょう。</p><p><strong>main.cpp. </strong>
+</li></ul></div><p>どちらも難しいですが実装してみましょう。</p><p><strong>main.cpp. </strong>
 </p><pre xmlns="" class="prettyprint">  1 #include &lt;cstddef&gt;
   2 #include &lt;memory&gt;
   3 #include &lt;cassert&gt;
@@ -262,7 +262,7 @@ reuse pointer 0x56354f80a228 for size 16
 reuse pointer 0x56354f80a218 for size 16
 reuse pointer 0x56354f80a208 for size 16
 reuse pointer 0x56354f80a1f8 for size 16</pre><p>
-</p><p>　このアロケーターは allocator クラステンプレートに実装していますね。</p><pre xmlns="" class="prettyprint"> 11 #define MAX_OBJECTS 32
+</p><p>このアロケーターは allocator クラステンプレートに実装していますね。</p><pre xmlns="" class="prettyprint"> 11 #define MAX_OBJECTS 32
  12
  13 template&lt;typename T,size_t N&gt;
  14 class allocator
@@ -301,7 +301,7 @@ reuse pointer 0x56354f80a1f8 for size 16</pre><p>
  96   unsigned M_pool_index_; //新規割当時にインクリメント、下がることはない
  97   unsigned M_block_in_use_;
  98   std::byte Mp_Mem_[sizeof(std::byte[N])*MAX_OBJECTS];
- 99 };</pre><p>　最初に見ておきたいのが以下の 5 つです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+ 99 };</pre><p>最初に見ておきたいのが以下の 5 つの変数・ポインターです。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
 Mp_mem_
 </span></dt><dd>
 スタック記憶域
@@ -321,17 +321,17 @@ M_pool_index_
 M_block_size_
 </span></dt><dd>
 アロケーターが割り当てるブロック（最少単位）のサイズ
-</dd></dl></div><p>　これらのオブジェクト・変数はコンストラクターで初期化されています。</p><pre xmlns="" class="prettyprint"> 22   allocator()
+</dd></dl></div><p>これらのオブジェクト・変数はコンストラクターで初期化されています。</p><pre xmlns="" class="prettyprint"> 22   allocator()
  23     :
  24     M_max_objects_(MAX_OBJECTS),
  25     M_pool_index_(0),
  26     M_block_size_(sizeof(std::byte[N]) &lt; 8 ? sizeof(long long) : sizeof(std::byte[N]))
  27   {
  28     Mp_pool_ = ::new (&amp;Mp_Mem_) std::byte[M_block_size_*MAX_OBJECTS];
- 29   }</pre><p>　 Mp_pool_ は Mp_mem_ のアドレスにある std::byte[] 配列を指すポインターとなり、これをメモリープールと呼びます。</p><p>　メモリープール Mp_pool_ は単に割り当て可能なメモリー領域となります。</p><p>　そして MAX_OBJECTS は任意の値ですが 32 個になってますね。</p><pre xmlns="" class="prettyprint"> 11 #define MAX_OBJECTS 32</pre><p>　これは最大オブジェクト数を意味します。</p><pre xmlns="" class="prettyprint"> 24     M_max_objects_(MAX_OBJECTS),</pre><p>　したがって M_max_objects が最大オブジェクト「数」ってことです。</p><p>　M_block_size_ はブロックのバイトサイズなので個数じゃないので混同しないでくださいね。</p><p>　ブロックサイズはオブジェクトのサイズである「sizeof(T)」以上に念の為にとっておきます。</p><pre xmlns="" class="prettyprint"> 19   static_assert(sizeof(std::byte[N]) &gt;= sizeof(T));</pre><p>　さらにポインター型をサポートしたいのでブロックサイズは 8 バイト以上に強制的に設定しておきます。</p><pre xmlns="" class="prettyprint"> 26     M_block_size_(sizeof(std::byte[N]) &lt; 8 ? sizeof(long long) : sizeof(std::byte[N]))</pre><p>　もっと小さい値を使う場合にしても、後で STL コンテナと使う場合には reserve() 関数を使う std::vector 等では コンテナが勝手に使い方を決めてしまうので、かなり無駄になるかも知りませんね…</p><p>　(´・ω・｀)</p><p>　後はメモリープールはこの 2 つを使って定義します。</p><pre xmlns="" class="prettyprint"> 28     Mp_pool_ = ::new (&amp;Mp_Mem_) std::byte[M_block_size_*MAX_OBJECTS];</pre><p>　voidポインターでなく、std::byte ポインターをベースに使うのはポインター算術が使えるからです。</p><p>　まあ char ポインターでも良いんですけどね…</p><p>　ちなみにスタックアロケーターはヒープアロケーターと比べ大容量に弱いので MAX_OBJECTS または M_max_objects はあまり巨大な数値にするのはやめときましょう。</p><p>　後はメモリーを解放後に管理するためのキャッシュ記憶域ですが、これは単に単方向の連結リストを使います。</p><pre xmlns="" class="prettyprint"> 85   // 使用可能なメモリータグ（一度割当、後に開放された領域）
+ 29   }</pre><p>Mp_pool_ は Mp_mem_ のアドレスにある std::byte[] 配列を指すポインターとなり、これをメモリープールと呼びます。</p><p>メモリープール Mp_pool_ は単に割り当て可能なメモリー領域となります。</p><p>そして MAX_OBJECTS は任意の値ですが 32 個になってますね。</p><pre xmlns="" class="prettyprint"> 11 #define MAX_OBJECTS 32</pre><p>これは最大オブジェクト数を意味します。</p><pre xmlns="" class="prettyprint"> 24     M_max_objects_(MAX_OBJECTS),</pre><p>したがって M_max_objects が最大オブジェクト「数」ってことです。</p><p>M_block_size_ はブロックのバイトサイズなので個数じゃないので混同しないでくださいね。</p><p>ブロックサイズはオブジェクトのサイズである「sizeof(T)」以上に念の為にとっておきます。</p><pre xmlns="" class="prettyprint"> 19   static_assert(sizeof(std::byte[N]) &gt;= sizeof(T));</pre><p>さらにポインター型をサポートしたいのでブロックサイズは 8 バイト以上に強制的に設定しておきます。</p><pre xmlns="" class="prettyprint"> 26     M_block_size_(sizeof(std::byte[N]) &lt; 8 ? sizeof(long long) : sizeof(std::byte[N]))</pre><p>もっと小さい値を使う場合にしても、後で STL コンテナと使う場合には reserve() 関数を使う std::vector 等では コンテナが勝手に使い方を決めてしまうので、かなり無駄になるかも知りませんね…</p><p>(´・ω・｀)</p><p>後はメモリープールはこの 2 つを使って定義します。</p><pre xmlns="" class="prettyprint"> 28     Mp_pool_ = ::new (&amp;Mp_Mem_) std::byte[M_block_size_*MAX_OBJECTS];</pre><p>voidポインターでなく、std::byte ポインターをベースに使うのはポインター算術が使えるからです。</p><p>まあ char ポインターでも良いんですけどね…</p><p>ちなみにスタックアロケーターはヒープアロケーターと比べ大容量に弱いので MAX_OBJECTS または M_max_objects はあまり巨大な数値にするのはやめときましょう。</p><p>後はメモリーを解放後に管理するためのキャッシュ記憶域ですが、これは単に単方向の連結リストを使います。</p><pre xmlns="" class="prettyprint"> 85   // 使用可能なメモリータグ（一度割当、後に開放された領域）
  86   struct block_not_in_use {
  87     block_not_in_use *next;
- 88   };</pre><p>　struct block_not_in_use は一つのポインターを持つだけの連結リストとして、フリーチャンクを保持します。</p><p>　具体には deallocate() をコールするたびにｍ以下のように先頭ポインターを先に進めることで使います。</p><p>　先頭を更新していきます。</p><pre xmlns="" class="prettyprint"> 65   // 開放(deallocate)時に使用可能チャンクを更新
+ 88   };</pre><p>struct block_not_in_use は一つのポインターを持つだけの連結リストとして、フリーチャンクを保持します。</p><p>具体には deallocate() をコールするたびに以下のように先頭ポインターを先に進めることで使います。</p><p>先頭を更新していきます。</p><pre xmlns="" class="prettyprint"> 65   // 開放(deallocate)時に使用可能チャンクを更新
  66   void rewind(void* memory,size_t size){
  67     auto head = M_free_list_[size];
  68     block_not_in_use* pblock = static_cast&lt;block_not_in_use*&gt;(memory);

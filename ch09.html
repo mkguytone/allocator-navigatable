@@ -3,7 +3,7 @@
     window.addEventListener("load", function() {
       PR.prettyPrint();
 	  });	
-	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch08.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch10.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_リダイレクトのファイル記述子"></a>第9章 リダイレクトのファイル記述子</h2></div></div></div><p>　ここまでの説明でリダイレクトはファイルやターミナルに出力ができるってことは分かりましたよね？</p><p>　まあでもファイルやターミナルは別物なわけすんで、明らかに別物に対してリダイレクトするには、コンピューター的には裏で何か橋渡しされてないとおかしいです。</p><p>　その橋渡しになるのがファイル記述子（ file descriptor 、略して fd ）です。</p><p>　このファイル記述子は整数の番号が割り振られてます。</p><p>　例えば標準入力や標準出力には以下のような数値が定義されてます。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+	</script><script xmlns="" type="text/javascript" src="script/head.js"></script></head><body><div class="navheader"><table width="100%" summary="Navigation header"><tr><td width="20%" align="left"><a accesskey="p" href="ch08.html">戻る</a> </td><th width="60%" align="center"> </th><td width="20%" align="right"> <a accesskey="n" href="ch10.html">次へ</a></td></tr></table><hr /></div><div class="chapter"><div class="titlepage"><div><div><h2 class="title"><a id="_リダイレクトのファイル記述子"></a>第9章 リダイレクトのファイル記述子</h2></div></div></div><p>ここまでの説明でリダイレクトはファイルやターミナルに出力ができるってことは分かりましたよね？</p><p>まあでもファイルやターミナルは別物なわけすんで、明らかに別物に対してリダイレクトするには、コンピューター的には裏で何か橋渡しされてないとおかしいです。</p><p>その橋渡しになるのがファイル記述子（ file descriptor 、略して fd ）です。</p><p>このファイル記述子は整数の番号が割り振られてます。</p><p>例えば標準入力や標準出力には以下のような数値が定義されてます。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
 0
 </span></dt><dd>
 標準入力のファイル記述子
@@ -15,27 +15,27 @@
 2
 </span></dt><dd>
 標準エラーへのファイル記述子
-</dd></dl></div><p>　このファイル記述子はリダイレクトに直接使うことが可能です。</p><p>　このうちリダイレクトで使うのは通常は 1 と 2 です。</p><p>　0 も標準入力を使いたい</p><p>　ファイル記述子 1 については前の項目で軽く説明しましたね。</p><pre xmlns="" class="prettyprint">$ コマンド 1&gt;ファイル名
-$ コマンド 1&gt;&gt;ファイル名</pre><p>　実際のコマンドとリダイレクトに直すと以下のような感じになります。</p><pre xmlns="" class="prettyprint">$ echo "abc" 1&gt; abc.txt
+</dd></dl></div><p>このファイル記述子はリダイレクトに直接使うことが可能です。</p><p>このうちリダイレクトで使うのは通常は 1 と 2 です。</p><p>0 も標準入力を使いたい</p><p>ファイル記述子 1 については前の項目で軽く説明しましたね。</p><pre xmlns="" class="prettyprint">$ コマンド 1&gt;ファイル名
+$ コマンド 1&gt;&gt;ファイル名</pre><p>実際のコマンドとリダイレクトに直すと以下のような感じになります。</p><pre xmlns="" class="prettyprint">$ echo "abc" 1&gt; abc.txt
 $ cat abc.txt 1&gt; abc2.txt
 $ cat abc.txt 1&gt;&gt; abc2.txt
 $ cat abc2.txt
 abc
-abc</pre><p>　標準出力がリダイレクトで指定されたファイルに書き込まれていますね？</p><p>　少し理解が面倒なのが標準エラーです。</p><p>　標準エラーからファイルに書き込むには以下のような文法が使われます。</p><pre xmlns="" class="prettyprint">$ コマンド 2&gt;ファイル名
+abc</pre><p>標準出力がリダイレクトで指定されたファイルに書き込まれていますね？</p><p>少し理解が面倒なのが標準エラーです。</p><p>標準エラーからファイルに書き込むには以下のような文法が使われます。</p><pre xmlns="" class="prettyprint">$ コマンド 2&gt;ファイル名
 $ コマンド 2&gt;&gt;ファイル名
-$ コマンド &amp;&gt;ファイル名</pre><p>　文法は標準出力と同じですよね。</p><p>　単にファイル記述子の値が 1 から 2 に変わっているだけです。</p><p>　&amp;&gt; というリダイレクトは標準出力と標準エラーの両方を同時にファイルに書き込みます。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
+$ コマンド &amp;&gt;ファイル名</pre><p>文法は標準出力と同じですよね。</p><p>単にファイル記述子の値が 1 から 2 に変わっているだけです。</p><p>&amp;&gt; というリダイレクトは標準出力と標準エラーの両方を同時にファイルに書き込みます。</p><div class="variablelist"><dl class="variablelist"><dt><span class="term">
 &amp;&gt;
 </span></dt><dd>
 標準出力と標準エラーをリダイレクト
-</dd></dl></div><p>　それでどんなのが標準エラーなんですかね？</p><p>　標準エラーの一番簡単な発生のさせ方は存在しないファイルにアクセスしようとする場合です。</p><p>　例えば ls コマンドを使ってみましょう。</p><pre xmlns="" class="prettyprint">$ ls xxx &gt; abc.txt
-ls: 'xxx' にアクセスできません: そのようなファイルやディレクトリはありません</pre><p>　この場合、ファイル記述子が指定されてないのでデフォルトの標準出力のみがリダイレクトされます。</p><p>　確認してみましょう。</p><pre xmlns="" class="prettyprint">$ cat abc.txt</pre><p>　デフォルトの標準出力からのリダイレクトでは標準エラーはリダイレクトされてないですね。</p><p>　ではファイル記述子を 2 に変えてやってみましょう。</p><pre xmlns="" class="prettyprint">$ ls xxx 2&gt; abc.txt
+</dd></dl></div><p>それでどんなのが標準エラーなんですかね？</p><p>標準エラーの一番簡単な発生のさせ方は存在しないファイルにアクセスしようとする場合です。</p><p>例えば ls コマンドを使ってみましょう。</p><pre xmlns="" class="prettyprint">$ ls xxx &gt; abc.txt
+ls: 'xxx' にアクセスできません: そのようなファイルやディレクトリはありません</pre><p>この場合、ファイル記述子が指定されてないのでデフォルトの標準出力のみがリダイレクトされます。</p><p>確認してみましょう。</p><pre xmlns="" class="prettyprint">$ cat abc.txt</pre><p>デフォルトの標準出力からのリダイレクトでは標準エラーはリダイレクトされてないですね。</p><p>ではファイル記述子を 2 に変えてやってみましょう。</p><pre xmlns="" class="prettyprint">$ ls xxx 2&gt; abc.txt
 $ cat abc.txt
-ls: 'xxx' にアクセスできません: そのようなファイルやディレクトリはありません</pre><p>　このように標準エラーはファイル記述子を 2 にすればリダイレクトができるようになります。</p><p>　ちなみに標準出力と標準エラーの両方に対応できる &amp;&gt; も一応検証しておきましょう。</p><pre xmlns="" class="prettyprint">$ echo "abcde" &amp;&gt; abc.txt
+ls: 'xxx' にアクセスできません: そのようなファイルやディレクトリはありません</pre><p>このように標準エラーはファイル記述子を 2 にすればリダイレクトができるようになります。</p><p>ちなみに標準出力と標準エラーの両方に対応できる &amp;&gt; も一応検証しておきましょう。</p><pre xmlns="" class="prettyprint">$ echo "abcde" &amp;&gt; abc.txt
 $ cat abc.txt
 abcde
 $ ls xxx &amp;&gt; abc.txt
 $ cat abc.txt
-ls: 'xxx' にアクセスできません: そのようなファイルやディレクトリはありません</pre><p>　まあこのようにエラーも標準出力もリダイレクトしています。</p><p>　ちなみにここまでの構文をまとめると以下のようになります。</p><pre xmlns="" class="prettyprint">$ コマンド 入力ファイル記述子&gt;ファイル名</pre><p>　例外として &amp;&gt; がありますが、まあ覚えなきゃいけないほどの代物じゃないです。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch08.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt01.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch10.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><wrapper xmlns=""><p>Copyright 2018-2019, by Masaki Komatsu</p>
+ls: 'xxx' にアクセスできません: そのようなファイルやディレクトリはありません</pre><p>まあこのようにエラーも標準出力もリダイレクトしています。</p><p>ちなみにここまでの構文をまとめると以下のようになります。</p><pre xmlns="" class="prettyprint">$ コマンド 入力ファイル記述子&gt;ファイル名</pre><p>例外として &amp;&gt; がありますが、まあ覚えなきゃいけないほどの代物じゃないです。</p></div><div class="navfooter"><hr /><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch08.html">戻る</a> </td><td width="20%" align="center"><a accesskey="u" href="pt01.html">上に戻る</a></td><td width="40%" align="right"> <a accesskey="n" href="ch10.html">次へ</a></td></tr><tr><td width="40%" align="left" valign="top"> </td><td width="20%" align="center"><a accesskey="h" href="index.html">ホーム</a></td><td width="40%" align="right" valign="top"> </td></tr></table></div><wrapper xmlns=""><p>Copyright 2018-2019, by Masaki Komatsu</p>
 
 
 </wrapper></body></html>
